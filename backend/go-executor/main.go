@@ -18,7 +18,7 @@ type RecoveryResponse struct {
 	PaymentID string `json:"payment_id"`
 	Status    string `json:"status"`
 	Action    string `json:"action,omitempty"`
-	Recovered bool   `json:"recovered,omitempty"`
+	Recovered bool   `json:"recovered"`
 }
 
 func executeRecoveryHandler() http.Handler {
@@ -94,4 +94,62 @@ func main() {
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func executeRecoveryHandlerWithDependencies(
+	store CommandClaimer,
+	gateway RecoveryGateway,
+) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var command RecoveryCommand
+
+		if err := json.NewDecoder(r.Body).Decode(&command); err != nil {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+
+		claimed, err := store.Claim(command.CommandID)
+
+		if err != nil {
+			http.Error(
+				w,
+				"idempotency store error",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		if !claimed {
+			response := RecoveryResponse{
+				CommandID: command.CommandID,
+				PaymentID: command.PaymentID,
+				Status:    "DUPLICATE",
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(response)
+			return
+		}
+
+		log.Printf(
+			"Executing recovery: payment_id=%s action=%s amount=%.2f",
+			command.PaymentID,
+			command.Action,
+			command.Amount,
+		)
+
+		gatewayResult := gateway.Execute(command)
+
+		response := RecoveryResponse{
+			CommandID: command.CommandID,
+			PaymentID: command.PaymentID,
+			Status:    gatewayResult.Status,
+			Action:    gatewayResult.Action,
+			Recovered: gatewayResult.Status == "SUCCESS",
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+
+		_ = json.NewEncoder(w).Encode(response)
+	})
 }

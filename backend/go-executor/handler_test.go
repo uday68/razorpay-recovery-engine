@@ -150,3 +150,80 @@ func TestExecuteRecoveryWithPostgresIdempotency(t *testing.T) {
 		t.Fatalf("failed to clean up: %v", err)
 	}
 }
+func TestExecuteRecoveryReturnsGatewayOutcome(t *testing.T) {
+	handler := executeRecoveryHandler()
+
+	body := `{
+		"command_id": "gateway-outcome-001",
+		"payment_id": "payment-gateway-outcome-001",
+		"action": "RETRY_LATER",
+		"amount": 5000
+	}`
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/recovery/execute",
+		strings.NewReader(body),
+	)
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+
+	response := rec.Body.String()
+
+	if !strings.Contains(response, `"status"`) {
+		t.Fatalf("response missing status: %s", response)
+	}
+
+	if !strings.Contains(response, `"recovered"`) {
+		t.Fatalf("response missing recovered field: %s", response)
+	}
+}
+func TestExecuteRecoveryReturnsGatewayFailure(t *testing.T) {
+	gateway := &FakeGateway{
+		result: GatewayResult{
+			PaymentID: "payment-gateway-failure-001",
+			Action:    "RETRY_LATER",
+			Status:    "FAILED",
+			ErrorCode: "BANK_TIMEOUT",
+			Retryable: true,
+		},
+	}
+
+	handler := executeRecoveryHandlerWithDependencies(
+		NewCommandStore(),
+		gateway,
+	)
+
+	body := `{
+		"command_id": "gateway-failure-001",
+		"payment_id": "payment-gateway-failure-001",
+		"action": "RETRY_LATER",
+		"amount": 5000
+	}`
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/recovery/execute",
+		strings.NewReader(body),
+	)
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	response := rec.Body.String()
+
+	if !strings.Contains(response, `"status":"FAILED"`) {
+		t.Fatalf("expected FAILED status: %s", response)
+	}
+
+	if !strings.Contains(response, `"recovered":false`) {
+		t.Fatalf("expected recovered=false: %s", response)
+	}
+}
