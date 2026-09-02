@@ -3,6 +3,7 @@ from pathlib import Path
 
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
@@ -40,8 +41,10 @@ def build_pipeline():
         ]
     )
 
-    model = LogisticRegression(
-        max_iter=1000
+    model = RandomForestClassifier(
+        n_estimators=100,
+        random_state=42,
+        n_jobs=-1,
     )
 
     return Pipeline(

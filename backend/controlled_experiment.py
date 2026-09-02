@@ -8,6 +8,12 @@ from ml.model_store import load_model
 from backend.decision.engine import choose_action
 from backend.experiment import build_context,predict_actions
 
+from backend.policy.engine import apply_policy
+
+from backend.audit import create_audit_event
+
+
+
 ACTIONS = [
     "RETRY_NOW",
     "RETRY_LATER",
@@ -30,6 +36,7 @@ def run_controlled_experiment(
         payment_count =10000,
         seed=42,
         model=None,
+        return_audit_events=False
 ):
     random.seed(seed)
     customers = generate_customers(customer_count)
@@ -51,6 +58,12 @@ def run_controlled_experiment(
 
     ai_recoveries =0
     ai_revenue =0.0
+    ai_action =0
+    audit_events =[]
+
+    policy_allowed =0
+    policy_blocked = 0
+
 
     action_counts = {
         action:0
@@ -73,25 +86,64 @@ def run_controlled_experiment(
         #-----------------------------------
         # AI DECISION
         #-----------------------------------
-
         context = build_context(customer,payment)
 
         probabilities = predict_actions(model,context)
 
-        decision  = choose_action(payment.amount,probabilities)
+        decision = choose_action(
+            payment.amount,
+            probabilities,
+        )
 
-        selected_action  = decision["action"]
+        selected_action = decision["action"]
 
-        action_counts[selected_action]+=1
+        selected_probability = probabilities[selected_action]
 
+        policy = apply_policy(
+            action=selected_action,
+            amount=payment.amount,
+            probability=selected_probability,
+        )
+        approved_action = policy["action"]
 
-        ai_probability = recovery_probablity(customer,payment,selected_action)
+        audit_event = create_audit_event(
+            payment_id=payment.id,
+            customer_id=customer.id,
+            amount=payment.amount,
+            failure_code=payment.failure_code,
+            probabilities=probabilities,
+            recommended_action=selected_action,
+            expected_value=decision["expected_value"],
+            policy_allowed=policy["allowed"],
+            policy_reason=policy["reason"],
+            executed_action=approved_action,
+        )
 
-        ai_success = recovery_outcome(payment.id,selected_action,ai_probability)
+        if return_audit_events:
+            audit_events.append(audit_event)
 
-        if  ai_success:
-            ai_recoveries+=1
-            ai_revenue +=payment.amount
+        if policy["allowed"]:
+            policy_allowed += 1
+        else:
+            policy_blocked += 1
+
+        action_counts[approved_action] += 1
+
+        ai_probability = recovery_probablity(
+            customer,
+            payment,
+            approved_action,
+        )
+
+        ai_success = recovery_outcome(
+            payment.id,
+            approved_action,
+            ai_probability,
+        )
+
+        if ai_success:
+            ai_recoveries += 1
+            ai_revenue += payment.amount
 
 
     failed_count = len(failed_payments)
@@ -115,7 +167,7 @@ def run_controlled_experiment(
         if baseline_recovery_rate
         else 0.0)
     
-    return {
+    result = {
           "customers": customer_count,
         "payments": payment_count,
         "failed_payments": failed_count,
@@ -140,7 +192,13 @@ def run_controlled_experiment(
         "recovery_improvement": recovery_improvement,
 
         "action_counts": action_counts,
+        "policy_allowed": policy_allowed,
+        "policy_blocked": policy_blocked,
+        
 
     }
+    if return_audit_events:
+        result["audit_events"] = audit_events
 
+    return result
 
