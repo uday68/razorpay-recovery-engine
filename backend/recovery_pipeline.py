@@ -8,6 +8,9 @@ from backend.audit_repository import AuditRepository
 from backend.decision.engine import choose_action
 from backend.experiment import build_context, predict_actions
 from backend.policy.engine import apply_policy
+from backend.recovery_command import create_recovery_command
+from backend.recovery_executor import RecoveryExecutor
+from backend.go_executor_client import GoExecutorClient
 
 
 ACTIONS = [
@@ -20,9 +23,19 @@ ACTIONS = [
 
 class RecoveryPipeline:
 
-    def __init__(self, database_url):
+    def __init__(
+        self,
+        database_url="postgresql://recovery:recovery@localhost:5432/recovery_engine",
+        go_executor_url=None,
+    ):
         self.model = load_model()
         self.audit_repository = AuditRepository(database_url)
+        self.executor = RecoveryExecutor()
+        self.go_executor_url = go_executor_url
+        self.go_executor = (
+            GoExecutorClient(go_executor_url)
+            if go_executor_url else None
+        )
 
     def process_payment(
         self,
@@ -34,7 +47,7 @@ class RecoveryPipeline:
         recovery_rate,
         payment_method,
         bank,
-        hour,
+        hour=0,
     ):
         claimed = self.audit_repository.claim_payment(
             payment_id
@@ -120,26 +133,32 @@ class RecoveryPipeline:
             audit_event
         )
 
-        execution_probability = recovery_probablity(
-            customer,
-            payment,
-            executed_action,
-        )
+        command = create_recovery_command(payment_id, executed_action, amount)
 
-        success = execute_recovery(
-            customer,
-            payment,
-            executed_action,
-        )
+        if self.go_executor is not None:
+            execution_result = self.go_executor.execute(command)
+        else:
+            execution_result = self.executor.execute(
+                command=command,
+                customer_success_rate=success_rate,
+                customer_recovery_rate=recovery_rate,
+                failure_code=failure_code,
+            )
 
         return {
             "payment_id": payment_id,
+            "duplicate": False,
             "recommended_action": recommended_action,
             "probabilities": probabilities,
             "expected_value": decision["expected_value"],
             "policy_allowed": policy["allowed"],
             "policy_reason": policy["reason"],
             "executed_action": executed_action,
-            "execution_probability": execution_probability,
-            "recovered": success,
+            "execution_probability": execution_result.get("execution_probability"),
+            "recovered": execution_result.get(
+                "recovered",
+                execution_result.get("status") == "EXECUTED",
+            ),
+            "recovery_command": command,
+            "execution_result": execution_result,
         }

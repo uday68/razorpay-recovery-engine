@@ -1,3 +1,9 @@
+
+import sys
+import uuid
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from backend.audit_repository import AuditRepository
 
 
@@ -39,3 +45,15 @@ def test_audit_event_can_be_saved_and_retrieved():
     assert stored["recommended_action"] == "RETRY_LATER"
     assert stored["policy_allowed"] is True
     assert stored["executed_action"] == "RETRY_LATER"
+def test_command_can_be_claimed_only_once():
+    repository = AuditRepository(
+        "postgresql://recovery:recovery@localhost:5432/recovery_engine"
+    )
+
+    command_id = f"repository-command-test-{uuid.uuid4()}"
+
+    first = repository.claim_command(command_id)
+    second = repository.claim_command(command_id)
+
+    assert first is True
+    assert second is False

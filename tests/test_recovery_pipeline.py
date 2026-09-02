@@ -9,8 +9,11 @@ def test_pipeline_processes_payment_and_persists_audit():
         )
     )
 
+    import uuid
+    payment_id = f"pipeline-test-{uuid.uuid4()}"
+
     result = pipeline.process_payment(
-        payment_id="pipeline-test-001",
+        payment_id=payment_id,
         customer_id="customer-test-001",
         amount=5000.0,
         failure_code="BANK_TIMEOUT",
@@ -21,7 +24,7 @@ def test_pipeline_processes_payment_and_persists_audit():
         hour=14,
     )
 
-    assert result["payment_id"] == "pipeline-test-001"
+    assert result["payment_id"] == payment_id
     assert result["recommended_action"] in {
         "RETRY_NOW",
         "RETRY_LATER",
@@ -34,10 +37,15 @@ def test_pipeline_processes_payment_and_persists_audit():
     assert "policy_allowed" in result
     assert "executed_action" in result
 
+    count = pipeline.audit_repository.count_by_payment_id(
+        payment_id
+    )
+    assert count == 1
+
     stored = pipeline.audit_repository.get_by_payment_id(
-        "pipeline-test-001"
+        payment_id
     )
 
     assert stored is not None
-    assert stored["payment_id"] == "pipeline-test-001"
+    assert stored["payment_id"] == payment_id
     assert stored["executed_action"] == result["executed_action"]

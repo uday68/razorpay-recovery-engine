@@ -44,6 +44,14 @@ class AuditRepository:
                         );
                         """
                     )
+                cursor.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS command_idempotency (
+                            command_id TEXT PRIMARY KEY,
+                            claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                        );
+                        """
+                    )
     def save(self,event):
         with self._connect() as connection:
             with connection.cursor() as cursor:
@@ -160,3 +168,19 @@ class AuditRepository:
                 row = cursor.fetchone()
 
                 return row is not None
+
+    def claim_command(self, command_id):
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO command_idempotency (command_id)
+                    VALUES (%s)
+                    ON CONFLICT (command_id)
+                    DO NOTHING
+                    RETURNING command_id
+                    """,
+                    (command_id,),
+                )
+
+                return cursor.fetchone() is not None
