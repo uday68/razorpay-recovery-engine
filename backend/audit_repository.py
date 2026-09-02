@@ -36,44 +36,54 @@ class AuditRepository:
                     );
                     """
                 )
+                cursor.execute(
+                        """
+                        CREATE TABLE IF NOT EXISTS recovery_idempotency (
+                            payment_id TEXT PRIMARY KEY,
+                            claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                        );
+                        """
+                    )
     def save(self,event):
         with self._connect() as connection:
             with connection.cursor() as cursor:
-                cursor.execute(
-                       """
-                    INSERT INTO recovery_audit (
-                        payment_id,
-                        customer_id,
-                        amount,
-                        failure_code,
-                        probabilities,
-                        recommended_action,
-                        expected_value,
-                        policy_allowed,
-                        policy_reason,
-                        executed_action,
-                        timestamp
-                    )
-                    VALUES (
-                        %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s,
-                        %s
-                    )
-                    """,
-                    (
-                        event["payment_id"],
-                        event["customer_id"],
-                        event["amount"],
-                        event["failure_code"],
-                        json.dumps(event["probabilities"]),
-                        event["recommended_action"],
-                        event["expected_value"],
-                        event["policy_allowed"],
-                        event["policy_reason"],
-                        event["executed_action"],
-                        event["timestamp"],
-                    ),
-                )
+               cursor.execute(
+    """
+    INSERT INTO recovery_audit (
+        payment_id,
+        customer_id,
+        amount,
+        failure_code,
+        probabilities,
+        recommended_action,
+        expected_value,
+        policy_allowed,
+        policy_reason,
+        executed_action,
+        timestamp
+    )
+    VALUES (
+        %s, %s, %s, %s, %s,
+        %s, %s, %s, %s, %s,
+        %s
+    )
+    ON CONFLICT (payment_id)
+    DO NOTHING
+    """,
+    (
+        event["payment_id"],
+        event["customer_id"],
+        event["amount"],
+        event["failure_code"],
+        json.dumps(event["probabilities"]),
+        event["recommended_action"],
+        event["expected_value"],
+        event["policy_allowed"],
+        event["policy_reason"],
+        event["executed_action"],
+        event["timestamp"],
+    ),
+)
     def get_by_payment_id(self, payment_id):
         with self._connect() as connection:
             with connection.cursor() as cursor:
@@ -117,3 +127,36 @@ class AuditRepository:
                     "executed_action": row[9],
                     "timestamp": row[10].isoformat(),
                 }
+
+    def count_by_payment_id(self, payment_id):
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM recovery_audit
+                    WHERE payment_id = %s
+                    """,
+                    (payment_id,),
+                )
+
+                return cursor.fetchone()[0]
+    def claim_payment(self, payment_id):
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO recovery_idempotency (
+                        payment_id
+                    )
+                    VALUES (%s)
+                    ON CONFLICT (payment_id)
+                    DO NOTHING
+                    RETURNING payment_id
+                    """,
+                    (payment_id,),
+                )
+
+                row = cursor.fetchone()
+
+                return row is not None
