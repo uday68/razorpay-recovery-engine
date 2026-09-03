@@ -6,6 +6,40 @@ import (
 	"time"
 )
 
+type alwaysRetryableGateway struct {
+	calls int
+}
+
+func (g *alwaysRetryableGateway) Execute(command RecoveryCommand) (GatewayResult, error) {
+	g.calls++
+
+	return GatewayResult{
+		PaymentID:   command.PaymentID,
+		Action:      command.Action,
+		Status:      "FAILED",
+		ErrorCode:   "GATEWAY_TIMEOUT",
+		Retryable:   true,
+		FailureType: "TRANSIENT",
+	}, nil
+}
+
+type permanentFailureGateway struct {
+	calls int
+}
+
+func (g *permanentFailureGateway) Execute(command RecoveryCommand) (GatewayResult, error) {
+	g.calls++
+
+	return GatewayResult{
+		PaymentID:   command.PaymentID,
+		Action:      command.Action,
+		Status:      "FAILED",
+		ErrorCode:   "CARD_EXPIRED",
+		FailureType: "PERMANENT",
+		Retryable:   false,
+	}, nil
+}
+
 type InfrastructureGatewayResult struct {
 	result GatewayResult
 	err    error
@@ -78,69 +112,69 @@ func TestRetryExecutorRetriesTransientFailure(t *testing.T) {
 	}
 }
 
-func TestRetryExecutorStopsOnPermanentFailure(t *testing.T) {
-	gateway := &SequenceGateway{
-		results: []GatewayResult{
-			{
-				Status:    "FAILED",
-				ErrorCode: "CARD_EXPIRED",
-			},
-		},
-	}
+// func TestRetryExecutorStopsOnPermanentFailure(t *testing.T) {
+// 	gateway := &SequenceGateway{
+// 		results: []GatewayResult{
+// 			{
+// 				Status:    "FAILED",
+// 				ErrorCode: "CARD_EXPIRED",
+// 			},
+// 		},
+// 	}
 
-	executor := NewRetryExecutor(gateway, 3)
+// 	executor := NewRetryExecutor(gateway, 3)
 
-	result := executor.Execute(RecoveryCommand{
-		CommandID: "retry-002",
-		PaymentID: "payment-002",
-		Action:    "RETRY_NOW",
-		Amount:    1000,
-	})
+// 	result := executor.Execute(RecoveryCommand{
+// 		CommandID: "retry-002",
+// 		PaymentID: "payment-002",
+// 		Action:    "RETRY_NOW",
+// 		Amount:    1000,
+// 	})
 
-	if result.Status != "FAILED" {
-		t.Fatalf("expected FAILED, got %s", result.Status)
-	}
+// 	if result.Status != "FAILED" {
+// 		t.Fatalf("expected FAILED, got %s", result.Status)
+// 	}
 
-	if gateway.calls != 1 {
-		t.Fatalf("expected 1 gateway call, got %d", gateway.calls)
-	}
-}
+// 	if gateway.calls != 1 {
+// 		t.Fatalf("expected 1 gateway call, got %d", gateway.calls)
+// 	}
+// }
 
-func TestRetryExecutorRespectsMaximumAttempts(t *testing.T) {
-	gateway := &SequenceGateway{
-		results: []GatewayResult{
-			{
-				Status:    "FAILED",
-				ErrorCode: "GATEWAY_TIMEOUT",
-			},
-			{
-				Status:    "FAILED",
-				ErrorCode: "GATEWAY_TIMEOUT",
-			},
-			{
-				Status:    "FAILED",
-				ErrorCode: "GATEWAY_TIMEOUT",
-			},
-		},
-	}
+// func TestRetryExecutorRespectsMaximumAttempts(t *testing.T) {
+// 	gateway := &SequenceGateway{
+// 		results: []GatewayResult{
+// 			{
+// 				Status:    "FAILED",
+// 				ErrorCode: "GATEWAY_TIMEOUT",
+// 			},
+// 			{
+// 				Status:    "FAILED",
+// 				ErrorCode: "GATEWAY_TIMEOUT",
+// 			},
+// 			{
+// 				Status:    "FAILED",
+// 				ErrorCode: "GATEWAY_TIMEOUT",
+// 			},
+// 		},
+// 	}
 
-	executor := NewRetryExecutor(gateway, 3)
+// 	executor := NewRetryExecutor(gateway, 3)
 
-	result := executor.Execute(RecoveryCommand{
-		CommandID: "retry-003",
-		PaymentID: "payment-003",
-		Action:    "RETRY_NOW",
-		Amount:    1000,
-	})
+// 	result := executor.Execute(RecoveryCommand{
+// 		CommandID: "retry-003",
+// 		PaymentID: "payment-003",
+// 		Action:    "RETRY_NOW",
+// 		Amount:    1000,
+// 	})
 
-	if result.Status != "FAILED" {
-		t.Fatalf("expected FAILED, got %s", result.Status)
-	}
+// 	if result.Status != "FAILED" {
+// 		t.Fatalf("expected FAILED, got %s", result.Status)
+// 	}
 
-	if gateway.calls != 3 {
-		t.Fatalf("expected exactly 3 attempts, got %d", gateway.calls)
-	}
-}
+// 	if gateway.calls != 3 {
+// 		t.Fatalf("expected exactly 3 attempts, got %d", gateway.calls)
+// 	}
+// }
 
 func TestRetryExecutionUsesBackoffBeforeRetry(t *testing.T) {
 	gateway := &SequenceGateway{
@@ -386,5 +420,72 @@ func TestRetryExecutorMarksInfrastructureErrorNonRetryableAfterMaxAttempts(t *te
 			"expected EXECUTOR_ERROR, got %s",
 			result.Outcome,
 		)
+	}
+}
+
+func TestRetryExecutorRespectsMaximumAttempts(t *testing.T) {
+	gateway := &alwaysRetryableGateway{}
+
+	executor := NewRetryExecutor(
+		gateway,
+		3,
+	)
+
+	command := RecoveryCommand{
+		CommandID: "cmd-retry-limit-001",
+		PaymentID: "pay-retry-limit-001",
+		Action:    "RETRY_NOW",
+		Amount:    5000,
+	}
+
+	result := executor.ExecuteWithMetadata(command)
+
+	if result.Attempts != 3 {
+		t.Fatalf(
+			"expected exactly 3 attempts, got %d",
+			result.Attempts,
+		)
+	}
+
+	if gateway.calls != 3 {
+		t.Fatalf(
+			"expected gateway to be called 3 times, got %d",
+			gateway.calls,
+		)
+	}
+}
+func TestRetryExecutorStopsOnPermanentFailure(t *testing.T) {
+	gateway := &permanentFailureGateway{}
+
+	executor := NewRetryExecutor(
+		gateway,
+		3,
+	)
+
+	command := RecoveryCommand{
+		CommandID: "cmd-permanent-001",
+		PaymentID: "pay-permanent-001",
+		Action:    "RETRY_NOW",
+		Amount:    5000,
+	}
+
+	result := executor.ExecuteWithMetadata(command)
+
+	if result.Attempts != 1 {
+		t.Fatalf(
+			"expected exactly 1 attempt for permanent failure, got %d",
+			result.Attempts,
+		)
+	}
+
+	if gateway.calls != 1 {
+		t.Fatalf(
+			"expected gateway to be called once, got %d",
+			gateway.calls,
+		)
+	}
+
+	if result.Recovered {
+		t.Fatal("permanent failure must not be marked recovered")
 	}
 }

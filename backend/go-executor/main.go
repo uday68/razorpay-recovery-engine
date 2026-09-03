@@ -279,6 +279,11 @@ func executeRecoveryHandlerWithExecutorAndMetrics(
 			return
 		}
 
+		if err := validateRecoveryCommand(command); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
 		claimed, err := store.Claim(command.CommandID)
 		if err != nil {
 			http.Error(w, "idempotency error", http.StatusInternalServerError)

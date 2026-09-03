@@ -37,25 +37,22 @@ func (m *RecoveryMetrics) Record(result ExecutionResult) {
 	m.totalExecutions++
 	m.totalAttempts += result.Attempts
 
-	switch result.Outcome {
-	case "EXECUTED":
+	if result.Recovered || result.Outcome == "EXECUTED" {
 		m.recoveredExecutions++
 		m.recoveredRevenue += result.Amount
-
-	case "FAILED_RETRYABLE":
+	} else {
 		m.failedExecutions++
+	}
+
+	switch result.Outcome {
+	case "FAILED_RETRYABLE":
 		m.retryableFailures++
 
 	case "FAILED_PERMANENT":
-		m.failedExecutions++
 		m.permanentFailures++
 
 	case "EXECUTOR_ERROR":
-		m.failedExecutions++
 		m.executorErrors++
-
-	default:
-		m.failedExecutions++
 	}
 }
 

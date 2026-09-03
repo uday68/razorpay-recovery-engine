@@ -116,38 +116,39 @@ func TestRecoveryMetricsCalculatesRecoveryRate(t *testing.T) {
 		)
 	}
 }
-func TestRecoveryMetricsTracksRecoveredRevenue(t *testing.T) {
-	metrics := NewRecoveryMetrics()
 
-	metrics.Record(ExecutionResult{
-		FinalResult: GatewayResult{
-			Status: "SUCCESS",
-		},
-		Attempts:  2,
-		Outcome:   "EXECUTED",
-		Recovered: true,
-		Amount:    2500,
-	})
+// func TestRecoveryMetricsTracksRecoveredRevenue(t *testing.T) {
+// 	metrics := NewRecoveryMetrics()
 
-	metrics.Record(ExecutionResult{
-		FinalResult: GatewayResult{
-			Status: "FAILED",
-		},
-		Attempts:  1,
-		Outcome:   "FAILED_PERMANENT",
-		Recovered: false,
-		Amount:    1500,
-	})
+// 	metrics.Record(ExecutionResult{
+// 		FinalResult: GatewayResult{
+// 			Status: "SUCCESS",
+// 		},
+// 		Attempts:  2,
+// 		Outcome:   "EXECUTED",
+// 		Recovered: true,
+// 		Amount:    2500,
+// 	})
 
-	snapshot := metrics.Snapshot()
+// 	metrics.Record(ExecutionResult{
+// 		FinalResult: GatewayResult{
+// 			Status: "FAILED",
+// 		},
+// 		Attempts:  1,
+// 		Outcome:   "FAILED_PERMANENT",
+// 		Recovered: false,
+// 		Amount:    1500,
+// 	})
 
-	if snapshot.RecoveredRevenue != 2500 {
-		t.Fatalf(
-			"expected recovered revenue 2500, got %f",
-			snapshot.RecoveredRevenue,
-		)
-	}
-}
+// 	snapshot := metrics.Snapshot()
+
+// 	if snapshot.RecoveredRevenue != 2500 {
+// 		t.Fatalf(
+// 			"expected recovered revenue 2500, got %f",
+// 			snapshot.RecoveredRevenue,
+// 		)
+// 	}
+// }
 func TestRecoveryMetricsTracksOutcomes(t *testing.T) {
 	metrics := NewRecoveryMetrics()
 
@@ -251,6 +252,57 @@ func TestRecoveryMetricsSnapshotIsDeterministic(t *testing.T) {
 			"expected recovery rate %f, got %f",
 			expectedRecoveryRate,
 			snapshot.RecoveryRate,
+		)
+	}
+}
+func TestRecoveryMetricsTracksRecoveredRevenue(t *testing.T) {
+	metrics := NewRecoveryMetrics()
+
+	metrics.Record(ExecutionResult{
+		Recovered: true,
+		Attempts:  1,
+		Amount:    5000,
+	})
+
+	metrics.Record(ExecutionResult{
+		Recovered: true,
+		Attempts:  2,
+		Amount:    3000,
+	})
+
+	metrics.Record(ExecutionResult{
+		Recovered: false,
+		Attempts:  3,
+		Amount:    2000,
+	})
+
+	snapshot := metrics.Snapshot()
+
+	if snapshot.TotalExecutions != 3 {
+		t.Fatalf(
+			"expected 3 executions, got %d",
+			snapshot.TotalExecutions,
+		)
+	}
+
+	if snapshot.RecoveredExecutions != 2 {
+		t.Fatalf(
+			"expected 2 recovered executions, got %d",
+			snapshot.RecoveredExecutions,
+		)
+	}
+
+	if snapshot.TotalAttempts != 6 {
+		t.Fatalf(
+			"expected 6 total attempts, got %d",
+			snapshot.TotalAttempts,
+		)
+	}
+
+	if snapshot.RecoveredRevenue != 8000 {
+		t.Fatalf(
+			"expected recovered revenue 8000, got %f",
+			snapshot.RecoveredRevenue,
 		)
 	}
 }

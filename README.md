@@ -81,7 +81,132 @@ This outputs detailed metrics including total recoveries, revenue recovered, pol
 - **Business Rule Enforcement**: The ML model recommends actions based on probability and expected value, but the Policy Engine enforces safety boundaries and fallbacks.
 - **Multi-Trial Trained ML**: Trained on 59,000+ repeated trials capturing ground-truth probability distributions across failure modes.
 
+## V1 Architecture & Proven Capabilities
+
+```text
+                    ┌──────────────────┐
+                    │   Python AI/ML   │
+                    │ Probability Model│
+                    └────────┬─────────┘
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │ Decision Engine  │
+                    │ Expected Value   │
+                    └────────┬─────────┘
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │  Policy Engine   │
+                    │ Guardrails       │
+                    └────────┬─────────┘
+                             │
+                      RecoveryCommand
+                             │
+                           HTTP
+                             ▼
+              ┌──────────────────────────┐
+              │       Go Executor        │
+              │                          │
+              │ Validation               │
+              │ Idempotency              │
+              │ Retry Policy             │
+              │ Failure Classification   │
+              │ Execution Outcome        │
+              │ Metrics                  │
+              └───────────┬──────────────┘
+                          │
+             ┌────────────┴─────────────┐
+             ▼                          ▼
+      ┌──────────────┐          ┌──────────────┐
+      │ PostgreSQL   │          │    Gateway   │
+      │ Idempotency  │          │  Simulator   │
+      │ Audit        │          │              │
+      └──────────────┘          └──────────────┘
+```
+
+### Verified V1 Capabilities
+
+| Requirement | Implementation & Proof | Status |
+| :--- | :--- | :---: |
+| **Structured recovery command** | JSON contract (`command_id`, `payment_id`, `action`, `amount`) | ✅ |
+| **Malformed command rejection** | Rejects invalid JSON schemas before entering execution | ✅ |
+| **Invalid action rejection** | Rejects unapproved action verbs (`STEAL_MONEY`, etc.) | ✅ |
+| **Amount validation** | Enforces positive amount values (`amount > 0`) | ✅ |
+| **Idempotency** | Prevents duplicate processing via in-memory & PostgreSQL store | ✅ |
+| **Duplicate execution prevention** | 2nd request yields `DUPLICATE` without a 2nd gateway call | ✅ |
+| **PostgreSQL-backed idempotency** | Atomic `INSERT ON CONFLICT DO NOTHING` locks | ✅ |
+| **Retryable failure handling** | Automatic classification of transient gateway errors (`GATEWAY_TIMEOUT`) | ✅ |
+| **Bounded retries** | Caps attempts strictly at 3 with exponential backoff & jitter | ✅ |
+| **Permanent failure stops immediately** | Terminal errors (`CARD_EXPIRED`) halt without retry | ✅ |
+| **Execution outcome** | Returns structured outcome strings (`EXECUTED`, `FAILED_PERMANENT`, etc.) | ✅ |
+| **Attempts tracking** | Accurately counts physical gateway interaction attempts | ✅ |
+| **Recovery tracking** | Distinguishes recovered transactions from total failures | ✅ |
+| **Recovered revenue metrics** | Quantifies total revenue saved and recovery percentage | ✅ |
+| **Python → Go integration** | Python pipeline dispatches commands over HTTP to Go executor | ✅ |
+| **Go → PostgreSQL** | Go engine maintains database transactions and audits | ✅ |
+| **Go → Gateway** | Interacts with simulated bank gateway with realistic failure modes | ✅ |
+| **Full E2E** | Python client to Go daemon to database and gateway verified | ✅ |
+| **Full Go test suite** | 48 unit and integration tests passing in ~4s | ✅ |
+
+> **Key Architectural Boundary:**  
+> `AI recommends ──► Policy authorizes ──► Go executes`  
+> *The machine learning model never gets direct access to money-moving execution.*
+
+---
+
+## V2 Target Architecture: Event-Driven Recovery Platform
+
+To scale beyond synchronous HTTP to handle **10,000 to 100,000 failed payments/second** during flash sales and banking outages:
+
+```text
+                    PAYMENT FAILURE
+                           │
+                           ▼
+                    ┌─────────────┐
+                    │    Kafka    │
+                    │ recovery.   │
+                    │   events    │
+                    └──────┬──────┘
+                           │
+                 ┌─────────┴─────────┐
+                 ▼                   ▼
+          AI Decision Worker    Risk/Policy
+                 │                   │
+                 └─────────┬─────────┘
+                           ▼
+                    Recovery Queue
+                           │
+                           ▼
+                  ┌────────────────┐
+                  │  Go Executors  │
+                  │    Workers     │
+                  └───────┬────────┘
+                          │
+                    ┌─────┴─────┐
+                    ▼           ▼
+                Gateway       Redis
+                    │           │
+                    └─────┬─────┘
+                          ▼
+                      PostgreSQL
+                          │
+                          ▼
+                    Observability
+```
+
+### V2 Core Distributed Concepts
+- **Kafka Partitioning**: Partition by `customer_id` / `merchant_id` for in-order processing.
+- **Consumer Groups & At-Least-Once Delivery**: Resilient async worker pools.
+- **Idempotent Consumers**: Deduplication via Redis distributed locks & PostgreSQL constraints.
+- **Concurrent Go Worker Pools**: Tunable worker pools with backpressure and rate limiting.
+- **Circuit Breakers & DLQs**: Protect downstream bank gateways during cascading outages.
+- **Scale Progression**: 10 → 100 → 1,000 → 10,000 → 100,000 payments/sec preserving zero duplicate executions.
+
+---
+
 ## Engineering Reports & Benchmarks
+- [V2 Architecture Roadmap (Event-Driven Recovery Platform)](docs/V2_ARCHITECTURE_ROADMAP.md)
 - [Benchmark & Performance Tracking (3-Way Multi-Seed Analysis)](docs/BENCHMARKS.md)
 - [2026-09-02 Engineering Day Report (V1 Go Execution Service)](docs/2026-09-02-v1-go-execution-day-report.md)
 - [2026-09-03 Session Report (Post-Execution Audit, Vectorization, 3-Way Experiments, Model Retraining)](docs/2026-09-03-session-report.md)

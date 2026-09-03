@@ -9,6 +9,21 @@ import (
 	"time"
 )
 
+type countingExecutor struct {
+	calls int
+}
+
+func (e *countingExecutor) ExecuteWithMetadata(command RecoveryCommand) ExecutionResult {
+	e.calls++
+
+	return ExecutionResult{
+		Recovered: true,
+		Attempts:  1,
+		Outcome:   "EXECUTED",
+		Retryable: false,
+		Amount:    command.Amount,
+	}
+}
 func TestExecuteRecovery(t *testing.T) {
 	body := `{
 		"command_id": "cmd-123",
@@ -537,5 +552,161 @@ func TestRecoveryCommandContract(t *testing.T) {
 
 	if command.Amount != 5000 {
 		t.Fatalf("unexpected amount: %v", command.Amount)
+	}
+}
+func TestRecoveryCommandValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		command RecoveryCommand
+		wantErr bool
+	}{
+		{
+			name: "valid command",
+			command: RecoveryCommand{
+				CommandID: "cmd-valid-001",
+				PaymentID: "pay-valid-001",
+				Action:    "RETRY_NOW",
+				Amount:    5000,
+			},
+			wantErr: false,
+		},
+		{
+			name: "missing command id",
+			command: RecoveryCommand{
+				PaymentID: "pay-valid-001",
+				Action:    "RETRY_NOW",
+				Amount:    5000,
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing payment id",
+			command: RecoveryCommand{
+				CommandID: "cmd-valid-001",
+				Action:    "RETRY_NOW",
+				Amount:    5000,
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid action",
+			command: RecoveryCommand{
+				CommandID: "cmd-valid-001",
+				PaymentID: "pay-valid-001",
+				Action:    "STEAL_MONEY",
+				Amount:    5000,
+			},
+			wantErr: true,
+		},
+		{
+			name: "zero amount",
+			command: RecoveryCommand{
+				CommandID: "cmd-valid-001",
+				PaymentID: "pay-valid-001",
+				Action:    "RETRY_NOW",
+				Amount:    0,
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative amount",
+			command: RecoveryCommand{
+				CommandID: "cmd-valid-001",
+				PaymentID: "pay-valid-001",
+				Action:    "RETRY_NOW",
+				Amount:    -100,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateRecoveryCommand(tt.command)
+
+			if (err != nil) != tt.wantErr {
+				t.Fatalf(
+					"validateRecoveryCommand() error = %v, wantErr = %v",
+					err,
+					tt.wantErr,
+				)
+			}
+		})
+	}
+}
+func TestRecoveryHandlerRejectsInvalidCommand(t *testing.T) {
+	payload := `{
+		"command_id": "cmd-invalid-001",
+		"payment_id": "pay-invalid-001",
+		"action": "INVALID_ACTION",
+		"amount": 5000
+	}`
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/recovery/execute",
+		strings.NewReader(payload),
+	)
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+
+	handler := executeRecoveryHandlerWithExecutor(
+		nil,
+		nil,
+	)
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code == http.StatusOK {
+		t.Fatalf("expected invalid command to be rejected, got status %d", rec.Code)
+	}
+}
+func TestRecoveryHandlerDoesNotExecuteDuplicateCommand(t *testing.T) {
+	store := NewCommandStore()
+
+	executor := &countingExecutor{}
+
+	payload := `{
+		"command_id": "cmd-duplicate-001",
+		"payment_id": "pay-duplicate-001",
+		"action": "RETRY_NOW",
+		"amount": 5000
+	}`
+
+	sendRequest := func() *httptest.ResponseRecorder {
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/v1/recovery/execute",
+			strings.NewReader(payload),
+		)
+
+		req.Header.Set("Content-Type", "application/json")
+
+		rec := httptest.NewRecorder()
+
+		handler := executeRecoveryHandlerWithExecutor(store, executor)
+		handler.ServeHTTP(rec, req)
+
+		return rec
+	}
+
+	first := sendRequest()
+
+	if first.Code != http.StatusOK {
+		t.Fatalf("first request failed: status=%d body=%s", first.Code, first.Body.String())
+	}
+
+	second := sendRequest()
+
+	if second.Code != http.StatusOK {
+		t.Fatalf("duplicate request failed: status=%d body=%s", second.Code, second.Body.String())
+	}
+
+	if executor.calls != 1 {
+		t.Fatalf(
+			"expected executor to be called once, got %d",
+			executor.calls,
+		)
 	}
 }
