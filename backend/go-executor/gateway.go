@@ -13,7 +13,7 @@ type GatewayResult struct {
 	Retryable   bool
 }
 type RecoveryGateway interface {
-	Execute(command RecoveryCommand) GatewayResult
+	Execute(command RecoveryCommand) (GatewayResult, error)
 }
 
 type SimulatedGateway struct{}
@@ -22,7 +22,7 @@ func NewSimulatedGateway() *SimulatedGateway {
 	return &SimulatedGateway{}
 }
 
-func (g *SimulatedGateway) Execute(command RecoveryCommand) GatewayResult {
+func (g *SimulatedGateway) Execute(command RecoveryCommand) (GatewayResult, error) {
 	// Deterministic outcome based on command ID.
 	hash := fnv.New32a()
 	_, _ = hash.Write([]byte(command.CommandID))
@@ -36,7 +36,7 @@ func (g *SimulatedGateway) Execute(command RecoveryCommand) GatewayResult {
 			Status:      "SUCCESS",
 			FailureType: "",
 			Retryable:   false,
-		}
+		}, nil
 	}
 
 	return GatewayResult{
@@ -46,5 +46,5 @@ func (g *SimulatedGateway) Execute(command RecoveryCommand) GatewayResult {
 		ErrorCode:   "GATEWAY_TIMEOUT",
 		FailureType: "TRANSIENT_FAILURE",
 		Retryable:   true,
-	}
+	}, nil
 }

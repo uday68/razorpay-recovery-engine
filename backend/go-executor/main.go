@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 )
 
 type RecoveryCommand struct {
@@ -19,6 +20,9 @@ type RecoveryResponse struct {
 	Status    string `json:"status"`
 	Action    string `json:"action,omitempty"`
 	Recovered bool   `json:"recovered"`
+	Retryable bool   `json:"retryable,omitempty"`
+	Outcome   string `json:"outcome,omitempty"`
+	Attempts  int    `json:"attempts,omitempty"`
 }
 
 func executeRecoveryHandler() http.Handler {
@@ -96,9 +100,78 @@ func main() {
 	}
 }
 
-func executeRecoveryHandlerWithDependencies(
+// func executeRecoveryHandlerWithDependencies(
+// 	store CommandClaimer,
+// 	gateway RecoveryGateway,
+// ) http.Handler {
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		var command RecoveryCommand
+
+// 		if err := json.NewDecoder(r.Body).Decode(&command); err != nil {
+// 			http.Error(w, "invalid request", http.StatusBadRequest)
+// 			return
+// 		}
+
+// 		claimed, err := store.Claim(command.CommandID)
+
+// 		if err != nil {
+// 			http.Error(
+// 				w,
+// 				"idempotency store error",
+// 				http.StatusInternalServerError,
+// 			)
+// 			return
+// 		}
+
+// 		if !claimed {
+// 			response := RecoveryResponse{
+// 				CommandID: command.CommandID,
+// 				PaymentID: command.PaymentID,
+// 				Status:    "DUPLICATE",
+// 			}
+
+// 			w.Header().Set("Content-Type", "application/json")
+// 			_ = json.NewEncoder(w).Encode(response)
+// 			return
+// 		}
+
+// 		log.Printf(
+// 			"Executing recovery: payment_id=%s action=%s amount=%.2f",
+// 			command.PaymentID,
+// 			command.Action,
+// 			command.Amount,
+// 		)
+// 		retryExecutor := NewRetryExecutorWithBackoff(
+// 			gateway,
+// 			3,
+// 			NewBackoffPolicy(100),
+// 			func(_ time.Duration) {},
+// 		)
+
+// 		executionResult := retryExecutor.ExecuteWithMetadata(command)
+
+// 		gatewayResult := executionResult.FinalResult
+
+// 		response := RecoveryResponse{
+// 			CommandID: command.CommandID,
+// 			PaymentID: command.PaymentID,
+// 			Status:    gatewayResult.Status,
+// 			Action:    gatewayResult.Action,
+// 			Recovered: executionResult.Recovered,
+// 			Retryable: executionResult.Retryable,
+// 			Outcome:   executionResult.Outcome,
+// 			Attempts:  executionResult.Attempts,
+// 		}
+
+// 		w.Header().Set("Content-Type", "application/json")
+
+// 		_ = json.NewEncoder(w).Encode(response)
+// 	})
+// }
+
+func executeRecoveryHandlerWithExecutor(
 	store CommandClaimer,
-	gateway RecoveryGateway,
+	executor RecoveryExecutor,
 ) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var command RecoveryCommand
@@ -109,13 +182,8 @@ func executeRecoveryHandlerWithDependencies(
 		}
 
 		claimed, err := store.Claim(command.CommandID)
-
 		if err != nil {
-			http.Error(
-				w,
-				"idempotency store error",
-				http.StatusInternalServerError,
-			)
+			http.Error(w, "idempotency error", http.StatusInternalServerError)
 			return
 		}
 
@@ -131,25 +199,35 @@ func executeRecoveryHandlerWithDependencies(
 			return
 		}
 
-		log.Printf(
-			"Executing recovery: payment_id=%s action=%s amount=%.2f",
-			command.PaymentID,
-			command.Action,
-			command.Amount,
-		)
-
-		gatewayResult := gateway.Execute(command)
+		executionResult := executor.ExecuteWithMetadata(command)
+		gatewayResult := executionResult.FinalResult
 
 		response := RecoveryResponse{
 			CommandID: command.CommandID,
 			PaymentID: command.PaymentID,
 			Status:    gatewayResult.Status,
 			Action:    gatewayResult.Action,
-			Recovered: gatewayResult.Status == "SUCCESS",
+			Recovered: executionResult.Recovered,
+			Retryable: executionResult.Retryable,
+			Outcome:   executionResult.Outcome,
+			Attempts:  executionResult.Attempts,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-
 		_ = json.NewEncoder(w).Encode(response)
 	})
+}
+
+func executeRecoveryHandlerWithDependencies(
+	store CommandClaimer,
+	gateway RecoveryGateway,
+) http.Handler {
+	executor := NewRetryExecutorWithBackoff(
+		gateway,
+		3,
+		NewBackoffPolicy(100),
+		time.Sleep,
+	)
+
+	return executeRecoveryHandlerWithExecutor(store, executor)
 }

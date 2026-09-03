@@ -1,15 +1,26 @@
 package main
 
 import (
+	"errors"
 	"testing"
 )
+
+type ErrorGateway struct {
+	err error
+}
+
+func (g *ErrorGateway) ExecuteWithError(
+	command RecoveryCommand,
+) (GatewayResult, error) {
+	return GatewayResult{}, g.err
+}
 
 type FakeGateway struct {
 	result GatewayResult
 }
 
-func (f *FakeGateway) Execute(command RecoveryCommand) GatewayResult {
-	return f.result
+func (f *FakeGateway) Execute(command RecoveryCommand) (GatewayResult, error) {
+	return f.result, nil
 }
 
 func TestGatewayExecutesRecovery(t *testing.T) {
@@ -22,7 +33,10 @@ func TestGatewayExecutesRecovery(t *testing.T) {
 		Amount:    5000,
 	}
 
-	result := gateway.Execute(command)
+	result, err := gateway.Execute(command)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if result.PaymentID != command.PaymentID {
 		t.Fatalf(
@@ -62,7 +76,10 @@ func TestGatewayClassifiesTransientFailure(t *testing.T) {
 		Amount:    5000,
 	}
 
-	result := gateway.Execute(command)
+	result, err := gateway.Execute(command)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if !result.Retryable {
 		t.Fatal("gateway timeout should be retryable")
@@ -85,7 +102,10 @@ func TestSimulatedGatewayReturnsStructuredFailure(t *testing.T) {
 		Amount:    5000,
 	}
 
-	result := gateway.Execute(command)
+	result, err := gateway.Execute(command)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if result.Status == "FAILED" {
 		if result.ErrorCode == "" {
@@ -118,7 +138,10 @@ func TestSimulatedGatewayClassifiesFailure(t *testing.T) {
 		Amount:    1000,
 	}
 
-	result := gateway.Execute(command)
+	result, err := gateway.Execute(command)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	if result.Status == "FAILED" {
 		if result.FailureType != "TRANSIENT_FAILURE" {
@@ -128,5 +151,40 @@ func TestSimulatedGatewayClassifiesFailure(t *testing.T) {
 		if !result.Retryable {
 			t.Fatal("expected transient failure to be retryable")
 		}
+	}
+}
+
+func TestPermanentFailureIsNotRetryable(t *testing.T) {
+	// gateway := NewSimulatedGateway()
+
+	result := GatewayResult{
+		PaymentID: "payment-123",
+		Action:    "RETRY_NOW",
+		Status:    "FAILED",
+		ErrorCode: "CARD_EXPIRED",
+	}
+
+	classifier := NewFailureClassifier()
+	classification := classifier.Classify(result.ErrorCode)
+	policy := NewRetryPolicy()
+
+	if policy.ShouldRetry(classification) {
+		t.Fatal("card expired must not be retried")
+	}
+}
+func TestGatewayCanReturnInfrastructureError(t *testing.T) {
+	gateway := &ErrorGateway{
+		err: errors.New("gateway unavailable"),
+	}
+
+	_, err := gateway.ExecuteWithError(RecoveryCommand{
+		CommandID: "infra-001",
+		PaymentID: "payment-infra",
+		Action:    "RETRY_NOW",
+		Amount:    1000,
+	})
+
+	if err == nil {
+		t.Fatal("expected gateway infrastructure error")
 	}
 }

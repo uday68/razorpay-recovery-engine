@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -225,5 +226,104 @@ func TestExecuteRecoveryReturnsGatewayFailure(t *testing.T) {
 
 	if !strings.Contains(response, `"recovered":false`) {
 		t.Fatalf("expected recovered=false: %s", response)
+	}
+}
+
+func TestExecuteRecoveryPermanentFailureStopsRetry(t *testing.T) {
+	store := NewCommandStore()
+
+	gateway := &FakeGateway{
+		result: GatewayResult{
+			PaymentID: "payment-permanent",
+			Action:    "RETRY_NOW",
+			Status:    "FAILED",
+			ErrorCode: "CARD_EXPIRED",
+		},
+	}
+
+	handler := executeRecoveryHandlerWithDependencies(store, gateway)
+
+	body := `{
+		"command_id": "cmd-permanent-001",
+		"payment_id": "payment-permanent",
+		"action": "RETRY_NOW",
+		"amount": 1000
+	}`
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/recovery/execute",
+		strings.NewReader(body),
+	)
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	var response RecoveryResponse
+
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatal(err)
+	}
+
+	if response.Status != "FAILED" {
+		t.Fatalf("expected FAILED, got %s", response.Status)
+	}
+
+	if response.Recovered {
+		t.Fatal("permanent failure must not be recovered")
+	}
+}
+func TestExecuteRecoveryReturnsRetryableForTransientFailure(t *testing.T) {
+	store := NewCommandStore()
+
+	gateway := &FakeGateway{
+		result: GatewayResult{
+			PaymentID: "payment-transient",
+			Action:    "RETRY_NOW",
+			Status:    "FAILED",
+			ErrorCode: "GATEWAY_TIMEOUT",
+		},
+	}
+
+	handler := executeRecoveryHandlerWithDependencies(store, gateway)
+
+	body := `{
+		"command_id": "cmd-transient-001",
+		"payment_id": "payment-transient",
+		"action": "RETRY_NOW",
+		"amount": 1000
+	}`
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/recovery/execute",
+		strings.NewReader(body),
+	)
+
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", rec.Code)
+	}
+
+	var response RecoveryResponse
+
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatal(err)
+	}
+
+	if response.Status != "FAILED" {
+		t.Fatalf("expected FAILED, got %s", response.Status)
+	}
+
+	if !response.Retryable {
+		t.Fatal("expected transient failure to be retryable")
 	}
 }
