@@ -508,3 +508,34 @@ func TestExecuteRecoveryHandlerWithStoreAndMetricsExists(t *testing.T) {
 		t.Fatal("expected handler, got nil")
 	}
 }
+func TestRecoveryCommandContract(t *testing.T) {
+	payload := `{
+        "command_id": "cmd-contract-001",
+        "payment_id": "pay-contract-001",
+        "action": "RETRY_NOW",
+        "amount": 5000
+    }`
+
+	var command RecoveryCommand
+
+	err := json.Unmarshal([]byte(payload), &command)
+	if err != nil {
+		t.Fatalf("failed to decode command: %v", err)
+	}
+
+	if command.CommandID != "cmd-contract-001" {
+		t.Fatalf("unexpected command_id: %s", command.CommandID)
+	}
+
+	if command.PaymentID != "pay-contract-001" {
+		t.Fatalf("unexpected payment_id: %s", command.PaymentID)
+	}
+
+	if command.Action != "RETRY_NOW" {
+		t.Fatalf("unexpected action: %s", command.Action)
+	}
+
+	if command.Amount != 5000 {
+		t.Fatalf("unexpected amount: %v", command.Amount)
+	}
+}
