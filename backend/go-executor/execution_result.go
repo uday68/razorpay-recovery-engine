@@ -6,4 +6,5 @@ type ExecutionResult struct {
 	Outcome     string
 	Retryable   bool
 	Recovered   bool
+	Amount      float64
 }

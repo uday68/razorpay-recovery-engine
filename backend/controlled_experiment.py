@@ -1,6 +1,7 @@
 import random
 import sys
 from pathlib import Path
+import pandas as pd
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from simulator.generator import generate_payments,generate_customers
 from simulator.recovery import recovery_probablity
@@ -9,6 +10,7 @@ from backend.decision.engine import choose_action
 from backend.experiment import build_context,predict_actions
 
 from backend.policy.engine import apply_policy
+from backend.rule_baseline import choose_rule_action
 
 from backend.audit import create_audit_event
 
@@ -20,7 +22,25 @@ ACTIONS = [
     "SEND_REMINDER",
     "NO_ACTION",
 ]
+def evaluate_strategy(payment, customer, action):
+    probability = recovery_probablity(
+        customer,
+        payment,
+        action,
+    )
 
+    recovered = recovery_outcome(
+        payment.id,
+        action,
+        probability,
+    )
+
+    return {
+        "action": action,
+        "probability": probability,
+        "recovered": recovered,
+        "recovered_revenue": payment.amount if recovered else 0.0,
+    }
 def recovery_outcome(payment_id,action, probability):
     """
     generate a deterministic recovery outcome.
@@ -56,6 +76,9 @@ def run_controlled_experiment(
     baseline_recoveries = 0
     baseline_revenue = 0.0
 
+    rule_recoveries = 0
+    rule_revenue = 0.0
+
     ai_recoveries =0
     ai_revenue =0.0
     ai_action =0
@@ -63,13 +86,33 @@ def run_controlled_experiment(
 
     policy_allowed =0
     policy_blocked = 0
+    ai_selected_no_action =0
 
 
     action_counts = {
         action:0
         for action in ACTIONS   
     }
-    for payment in failed_payments:
+    recommended_action_counts = {
+        action : 0
+        for action in ACTIONS
+    }
+
+    if failed_payments:
+        contexts = [
+            build_context(customer_map[payment.customer_id], payment)
+            for payment in failed_payments
+        ]
+        all_rows = [
+            {**ctx, "action": action}
+            for ctx in contexts
+            for action in ACTIONS
+        ]
+        df = pd.DataFrame(all_rows)
+        all_probs = model.predict_proba(df)[:, 1]
+        n_actions = len(ACTIONS)
+
+    for i, payment in enumerate(failed_payments):
         customer = customer_map[payment.customer_id]
         #------------------------------
         #baseline
@@ -83,12 +126,29 @@ def run_controlled_experiment(
             baseline_recoveries+=1
             baseline_revenue+=payment.amount
 
+        # -----------------------------------
+        # RULE-BASED DECISION
+        # -----------------------------------
+        rule_action = choose_rule_action(payment.failure_code)
+        rule_result = evaluate_strategy(
+            payment,
+            customer,
+            rule_action,
+        )
+
+        if rule_result["recovered"]:
+            rule_recoveries += 1
+            rule_revenue += payment.amount
+
         #-----------------------------------
         # AI DECISION
         #-----------------------------------
-        context = build_context(customer,payment)
-
-        probabilities = predict_actions(model,context)
+        start_idx = i * n_actions
+        probs = all_probs[start_idx : start_idx + n_actions]
+        probabilities = {
+            action: float(prob)
+            for action, prob in zip(ACTIONS, probs)
+        }
 
         decision = choose_action(
             payment.amount,
@@ -96,6 +156,7 @@ def run_controlled_experiment(
         )
 
         selected_action = decision["action"]
+        recommended_action_counts[selected_action]+=1
 
         selected_probability = probabilities[selected_action]
 
@@ -105,6 +166,8 @@ def run_controlled_experiment(
             probability=selected_probability,
         )
         approved_action = policy["action"]
+        if selected_action == "NO_ACTION":
+            ai_selected_no_action+=1
 
         audit_event = create_audit_event(
             payment_id=payment.id,
@@ -145,14 +208,25 @@ def run_controlled_experiment(
             ai_recoveries += 1
             ai_revenue += payment.amount
 
-
     failed_count = len(failed_payments)
 
     baseline_recovery_rate = (baseline_recoveries/failed_count if failed_count else 0.0)
 
+    rule_recovery_rate = (
+        rule_recoveries / failed_count
+        if failed_count
+        else 0.0
+    )
+
     ai_recovery_rate = (ai_recoveries/failed_count if failed_count else 0.0)
 
     baseline_revenue_per_failure = (baseline_revenue/ failed_count if failed_count else 0.0)
+
+    rule_revenue_per_failure = (
+        rule_revenue / failed_count
+        if failed_count
+        else 0.0
+    )
 
     ai_revenue_per_failure = ( ai_revenue / failed_count
         if failed_count
@@ -168,19 +242,29 @@ def run_controlled_experiment(
         else 0.0)
     
     result = {
-          "customers": customer_count,
+        "customers": customer_count,
         "payments": payment_count,
         "failed_payments": failed_count,
         "at_risk_revenue": at_risk_revenue,
 
         "baseline": {
+            "failed_payments": failed_count,
             "recoveries": baseline_recoveries,
             "recovery_rate": baseline_recovery_rate,
             "recovered_revenue": baseline_revenue,
             "revenue_per_failure": baseline_revenue_per_failure,
         },
 
+        "rule_based": {
+            "failed_payments": failed_count,
+            "recoveries": rule_recoveries,
+            "recovery_rate": rule_recovery_rate,
+            "recovered_revenue": rule_revenue,
+            "revenue_per_failure": rule_revenue_per_failure,
+        },
+
         "ai": {
+            "failed_payments": failed_count,
             "recoveries": ai_recoveries,
             "recovery_rate": ai_recovery_rate,
             "recovered_revenue": ai_revenue,
@@ -192,10 +276,10 @@ def run_controlled_experiment(
         "recovery_improvement": recovery_improvement,
 
         "action_counts": action_counts,
+        "recommended_action_counts":recommended_action_counts,
         "policy_allowed": policy_allowed,
         "policy_blocked": policy_blocked,
-        
-
+        "ai_selected_no_action": ai_selected_no_action,
     }
     if return_audit_events:
         result["audit_events"] = audit_events

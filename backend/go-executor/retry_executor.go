@@ -50,14 +50,27 @@ func (e *RetryExecutor) Execute(command RecoveryCommand) GatewayResult {
 	for attempt := 1; attempt <= e.maxAttempts; attempt++ {
 		res, err := e.gateway.Execute(command)
 		if err != nil {
-			return GatewayResult{
+			result = GatewayResult{
 				PaymentID:   command.PaymentID,
 				Action:      command.Action,
 				Status:      "FAILED",
 				ErrorCode:   "GATEWAY_ERROR",
-				FailureType: "TRANSIENT_FAILURE",
-				Retryable:   true,
+				FailureType: "INFRASTRUCTURE_ERROR",
+				Retryable:   false,
 			}
+
+			infrastructurePolicy := NewInfrastructureRetryPolicy()
+			if !infrastructurePolicy.ShouldRetry(err) {
+				return result
+			}
+
+			if attempt < e.maxAttempts {
+				e.sleep(e.backoff.DelayWithJitter(attempt))
+				continue
+			}
+
+			result.Retryable = true
+			return result
 		}
 		result = res
 
@@ -90,19 +103,41 @@ func (e *RetryExecutor) ExecuteWithMetadata(command RecoveryCommand) ExecutionRe
 
 		res, err := e.gateway.Execute(command)
 		if err != nil {
-			return ExecutionResult{
-				FinalResult: GatewayResult{
-					PaymentID:   command.PaymentID,
-					Action:      command.Action,
-					Status:      "FAILED",
-					ErrorCode:   "GATEWAY_ERROR",
-					FailureType: "INFRASTRUCTURE_ERROR",
+			result = GatewayResult{
+				PaymentID:   command.PaymentID,
+				Action:      command.Action,
+				Status:      "FAILED",
+				ErrorCode:   "GATEWAY_ERROR",
+				FailureType: "INFRASTRUCTURE_ERROR",
+				Retryable:   false,
+			}
+
+			infrastructurePolicy := NewInfrastructureRetryPolicy()
+
+			if !infrastructurePolicy.ShouldRetry(err) {
+				return ExecutionResult{
+					FinalResult: result,
+					Attempts:    attempts,
+					Outcome:     "EXECUTOR_ERROR",
 					Retryable:   false,
-				},
-				Attempts:  attempts,
-				Outcome:   "EXECUTOR_ERROR",
-				Retryable: false,
-				Recovered: false,
+					Recovered:   false,
+					Amount:      command.Amount,
+				}
+			}
+
+			if attempt < e.maxAttempts {
+				e.sleep(e.backoff.DelayWithJitter(attempt))
+				continue
+			}
+
+			result.Retryable = true
+			return ExecutionResult{
+				FinalResult: result,
+				Attempts:    attempts,
+				Outcome:     "EXECUTOR_ERROR",
+				Retryable:   false,
+				Recovered:   false,
+				Amount:      command.Amount,
 			}
 		}
 		result = res
@@ -114,6 +149,7 @@ func (e *RetryExecutor) ExecuteWithMetadata(command RecoveryCommand) ExecutionRe
 				Outcome:     "EXECUTED",
 				Retryable:   false,
 				Recovered:   true,
+				Amount:      command.Amount,
 			}
 		}
 
@@ -129,6 +165,7 @@ func (e *RetryExecutor) ExecuteWithMetadata(command RecoveryCommand) ExecutionRe
 				Outcome:     "FAILED_PERMANENT",
 				Retryable:   false,
 				Recovered:   false,
+				Amount:      command.Amount,
 			}
 		}
 
@@ -143,5 +180,6 @@ func (e *RetryExecutor) ExecuteWithMetadata(command RecoveryCommand) ExecutionRe
 		Outcome:     "FAILED_RETRYABLE",
 		Retryable:   true,
 		Recovered:   false,
+		Amount:      command.Amount,
 	}
 }

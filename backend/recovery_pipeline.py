@@ -1,6 +1,9 @@
 from simulator.models import Customer, Payment
 from simulator.recovery import recovery_probablity, execute_recovery
 
+import responses
+from datetime import datetime
+
 from ml.model_store import load_model
 
 from backend.audit import create_audit_event
@@ -116,6 +119,29 @@ class RecoveryPipeline:
 
         executed_action = policy["action"]
 
+        command = create_recovery_command(
+            payment_id,
+            executed_action,
+            amount,
+        )
+
+        if self.go_executor is not None:
+            execution_result = self.go_executor.execute(command)
+        else:
+            execution_result = self.executor.execute(
+                command=command,
+                customer_success_rate=success_rate,
+                customer_recovery_rate=recovery_rate,
+                failure_code=failure_code,
+            )
+
+        if "retryable" not in execution_result:
+            execution_result["retryable"] = False
+        if "outcome" not in execution_result:
+            execution_result["outcome"] = "EXECUTED" if execution_result.get("recovered") else "FAILED_PERMANENT"
+        if "attempts" not in execution_result:
+            execution_result["attempts"] = 1
+
         audit_event = create_audit_event(
             payment_id=payment_id,
             customer_id=customer_id,
@@ -127,23 +153,12 @@ class RecoveryPipeline:
             policy_allowed=policy["allowed"],
             policy_reason=policy["reason"],
             executed_action=executed_action,
+            execution_result=execution_result,
         )
 
         self.audit_repository.save(
             audit_event
         )
-
-        command = create_recovery_command(payment_id, executed_action, amount)
-
-        if self.go_executor is not None:
-            execution_result = self.go_executor.execute(command)
-        else:
-            execution_result = self.executor.execute(
-                command=command,
-                customer_success_rate=success_rate,
-                customer_recovery_rate=recovery_rate,
-                failure_code=failure_code,
-            )
 
         return {
             "payment_id": payment_id,
@@ -162,3 +177,4 @@ class RecoveryPipeline:
             "recovery_command": command,
             "execution_result": execution_result,
         }
+   

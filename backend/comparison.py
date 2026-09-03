@@ -1,4 +1,5 @@
 import random
+import pandas as pd
 
 from simulator.generator import (
     generate_customers,
@@ -6,14 +7,12 @@ from simulator.generator import (
 )
 
 from simulator.recovery import execute_recovery
+from simulator.config import ACTION as ACTIONS
 
 from ml.model_store import load_model
 
 from backend.decision.engine import choose_action
-from backend.experiment import (
-    build_context,
-    predict_actions,
-)
+from backend.experiment import build_context
 
 
 def run_comparison(
@@ -51,64 +50,68 @@ def run_comparison(
     baseline_actions = 0
     ai_actions = 0
 
-    for payment in failed_payments:
-
-        customer = customer_map[
-            payment.customer_id
+    if failed_payments:
+        contexts = [
+            build_context(customer_map[p.customer_id], p)
+            for p in failed_payments
         ]
 
-        # -------------------------
-        # BASELINE
-        # -------------------------
+        all_rows = [
+            {**ctx, "action": action}
+            for ctx in contexts
+            for action in ACTIONS
+        ]
 
-        random.seed(
-            f"baseline-{payment.id}"
-        )
+        df = pd.DataFrame(all_rows)
+        all_probs = model.predict_proba(df)[:, 1]
+        n_actions = len(ACTIONS)
 
-        baseline_success = execute_recovery(
-            customer,
-            payment,
-            "RETRY_NOW",
-        )
+        for i, payment in enumerate(failed_payments):
+            customer = customer_map[payment.customer_id]
 
-        baseline_actions += 1
+            # -------------------------
+            # BASELINE
+            # -------------------------
+            random.seed(f"baseline-{payment.id}")
 
-        if baseline_success:
-            baseline_revenue += payment.amount
+            baseline_success = execute_recovery(
+                customer,
+                payment,
+                "RETRY_NOW",
+            )
 
-        # -------------------------
-        # AI ENGINE
-        # -------------------------
+            baseline_actions += 1
 
-        context = build_context(
-            customer,
-            payment,
-        )
+            if baseline_success:
+                baseline_revenue += payment.amount
 
-        probabilities = predict_actions(
-            model,
-            context,
-        )
+            # -------------------------
+            # AI ENGINE
+            # -------------------------
+            start_idx = i * n_actions
+            probs = all_probs[start_idx : start_idx + n_actions]
+            probabilities = {
+                action: float(prob)
+                for action, prob in zip(ACTIONS, probs)
+            }
 
-        decision = choose_action(
-            payment.amount,
-            probabilities,
-        )
+            decision = choose_action(
+                payment.amount,
+                probabilities,
+            )
 
-        random.seed(
-            f"ai-{payment.id}"
-        )
+            random.seed(f"ai-{payment.id}")
 
-        ai_success = execute_recovery(
-            customer,
-            payment,
-            decision["action"],
-        )
+            ai_success = execute_recovery(
+                customer,
+                payment,
+                decision["action"],
+            )
 
-        ai_actions += 1
+            ai_actions += 1
 
-        if ai_success:
-            ai_revenue += payment.amount
+            if ai_success:
+                ai_revenue += payment.amount
 
     return {
         "failed_payments": len(failed_payments),

@@ -32,8 +32,23 @@ class AuditRepository:
                         policy_reason TEXT NOT NULL,
 
                         executed_action TEXT NOT NULL,
+
+                        outcome TEXT,
+                        attempts INTEGER,
+                        recovered BOOLEAN,
+                        retryable BOOLEAN,
+
                         timestamp TIMESTAMPTZ NOT NULL
                     );
+                    """
+                )
+                cursor.execute(
+                    """
+                    ALTER TABLE recovery_audit
+                    ADD COLUMN IF NOT EXISTS outcome TEXT,
+                    ADD COLUMN IF NOT EXISTS attempts INTEGER,
+                    ADD COLUMN IF NOT EXISTS recovered BOOLEAN,
+                    ADD COLUMN IF NOT EXISTS retryable BOOLEAN
                     """
                 )
                 cursor.execute(
@@ -68,12 +83,16 @@ class AuditRepository:
         policy_allowed,
         policy_reason,
         executed_action,
+        outcome,
+        attempts,
+        recovered,
+        retryable,
         timestamp
     )
     VALUES (
         %s, %s, %s, %s, %s,
         %s, %s, %s, %s, %s,
-        %s
+        %s, %s, %s, %s, %s
     )
     ON CONFLICT (payment_id)
     DO NOTHING
@@ -89,6 +108,10 @@ class AuditRepository:
         event["policy_allowed"],
         event["policy_reason"],
         event["executed_action"],
+        event.get("outcome"),
+        event.get("attempts"),
+        event.get("recovered"),
+        event.get("retryable"),
         event["timestamp"],
     ),
 )
@@ -108,6 +131,10 @@ class AuditRepository:
                         policy_allowed,
                         policy_reason,
                         executed_action,
+                        outcome,
+                        attempts,
+                        recovered,
+                        retryable,
                         timestamp
                     FROM recovery_audit
                     WHERE payment_id = %s
@@ -133,7 +160,11 @@ class AuditRepository:
                     "policy_allowed": row[7],
                     "policy_reason": row[8],
                     "executed_action": row[9],
-                    "timestamp": row[10].isoformat(),
+                    "outcome": row[10],
+                    "attempts": row[11],
+                    "recovered": row[12],
+                    "retryable": row[13],
+                    "timestamp": row[14].isoformat(),
                 }
 
     def count_by_payment_id(self, payment_id):

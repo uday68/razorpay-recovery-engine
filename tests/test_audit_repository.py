@@ -57,3 +57,45 @@ def test_command_can_be_claimed_only_once():
 
     assert first is True
     assert second is False
+
+
+
+
+def test_audit_repository_persists_execution_result():
+    repository = AuditRepository(
+        "postgresql://recovery:recovery@localhost:5432/recovery_engine"
+    )
+
+    event = {
+        "payment_id": "audit-execution-001",
+        "customer_id": "customer-123",
+        "amount": 5000,
+        "failure_code": "BANK_TIMEOUT",
+        "probabilities": {
+            "RETRY_NOW": 0.6,
+            "RETRY_LATER": 0.8,
+            "SEND_REMINDER": 0.2,
+            "NO_ACTION": 0.0,
+        },
+        "recommended_action": "RETRY_LATER",
+        "expected_value": 3998,
+        "policy_allowed": True,
+        "policy_reason": "Action satisfies policy",
+        "executed_action": "RETRY_LATER",
+        "outcome": "EXECUTED",
+        "attempts": 2,
+        "recovered": True,
+        "retryable": False,
+        "timestamp": "2026-09-03T12:00:00+00:00",
+    }
+
+    repository.save(event)
+
+    stored = repository.get_by_payment_id(
+        "audit-execution-001"
+    )
+
+    assert stored["outcome"] == "EXECUTED"
+    assert stored["attempts"] == 2
+    assert stored["recovered"] is True
+    assert stored["retryable"] is False

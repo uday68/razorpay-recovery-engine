@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestExecuteRecovery(t *testing.T) {
@@ -325,5 +326,185 @@ func TestExecuteRecoveryReturnsRetryableForTransientFailure(t *testing.T) {
 
 	if !response.Retryable {
 		t.Fatal("expected transient failure to be retryable")
+	}
+}
+func TestMetricsHandlerReturnsSnapshot(t *testing.T) {
+	metrics := NewRecoveryMetrics()
+
+	metrics.Record(ExecutionResult{
+		Outcome:   "EXECUTED",
+		Recovered: true,
+		Attempts:  2,
+		Amount:    5000,
+	})
+
+	handler := metricsHandler(metrics)
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+
+	var response RecoveryMetricsSnapshot
+
+	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if response.TotalExecutions != 1 {
+		t.Fatalf(
+			"expected 1 execution, got %d",
+			response.TotalExecutions,
+		)
+	}
+
+	if response.RecoveredRevenue != 5000 {
+		t.Fatalf(
+			"expected recovered revenue 5000, got %f",
+			response.RecoveredRevenue,
+		)
+	}
+}
+func TestServerExposesMetricsEndpoint(t *testing.T) {
+	metrics := NewRecoveryMetrics()
+
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", metricsHandler(metrics))
+
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	recorder := httptest.NewRecorder()
+
+	mux.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+
+	if recorder.Header().Get("Content-Type") != "application/json" {
+		t.Fatalf(
+			"expected application/json, got %s",
+			recorder.Header().Get("Content-Type"),
+		)
+	}
+}
+func TestServerMetricsReflectExecution(t *testing.T) {
+	store := NewCommandStore()
+	metrics := NewRecoveryMetrics()
+
+	gateway := &FakeGateway{
+		result: GatewayResult{
+			PaymentID: "payment-123",
+			Action:    "RETRY_NOW",
+			Status:    "SUCCESS",
+		},
+	}
+
+	executor := NewRetryExecutorWithBackoff(
+		gateway,
+		1,
+		NewBackoffPolicy(1),
+		func(time.Duration) {},
+	)
+
+	mux := http.NewServeMux()
+
+	mux.Handle(
+		"/v1/recovery/execute",
+		executeRecoveryHandlerWithExecutorAndMetrics(
+			store,
+			executor,
+			metrics,
+		),
+	)
+
+	mux.Handle(
+		"/metrics",
+		metricsHandler(metrics),
+	)
+
+	body := `{
+        "command_id": "metrics-command-123",
+        "payment_id": "payment-123",
+        "action": "RETRY_NOW",
+        "amount": 5000
+    }`
+
+	executeReq := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/recovery/execute",
+		strings.NewReader(body),
+	)
+
+	executeRecorder := httptest.NewRecorder()
+
+	mux.ServeHTTP(executeRecorder, executeReq)
+
+	if executeRecorder.Code != http.StatusOK {
+		t.Fatalf(
+			"expected execution status 200, got %d",
+			executeRecorder.Code,
+		)
+	}
+
+	metricsReq := httptest.NewRequest(
+		http.MethodGet,
+		"/metrics",
+		nil,
+	)
+
+	metricsRecorder := httptest.NewRecorder()
+
+	mux.ServeHTTP(metricsRecorder, metricsReq)
+
+	if metricsRecorder.Code != http.StatusOK {
+		t.Fatalf(
+			"expected metrics status 200, got %d",
+			metricsRecorder.Code,
+		)
+	}
+
+	var snapshot RecoveryMetricsSnapshot
+
+	if err := json.NewDecoder(metricsRecorder.Body).Decode(&snapshot); err != nil {
+		t.Fatalf("failed to decode metrics: %v", err)
+	}
+
+	if snapshot.TotalExecutions != 1 {
+		t.Fatalf(
+			"expected 1 execution, got %d",
+			snapshot.TotalExecutions,
+		)
+	}
+
+	if snapshot.RecoveredExecutions != 1 {
+		t.Fatalf(
+			"expected 1 recovered execution, got %d",
+			snapshot.RecoveredExecutions,
+		)
+	}
+
+	if snapshot.RecoveredRevenue != 5000 {
+		t.Fatalf(
+			"expected recovered revenue 5000, got %f",
+			snapshot.RecoveredRevenue,
+		)
+	}
+}
+
+func TestExecuteRecoveryHandlerWithStoreAndMetricsExists(t *testing.T) {
+	store := NewCommandStore()
+	metrics := NewRecoveryMetrics()
+
+	handler := executeRecoveryHandlerWithStoreAndMetrics(
+		store,
+		metrics,
+	)
+
+	if handler == nil {
+		t.Fatal("expected handler, got nil")
 	}
 }

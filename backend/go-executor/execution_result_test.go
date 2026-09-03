@@ -39,4 +39,8 @@ func TestExecutionResultTracksAttempts(t *testing.T) {
 	if result.Outcome != "EXECUTED" {
 		t.Fatalf("expected EXECUTED, got %s", result.Outcome)
 	}
+
+	if result.Amount != 1000 {
+		t.Fatalf("expected amount 1000, got %f", result.Amount)
+	}
 }

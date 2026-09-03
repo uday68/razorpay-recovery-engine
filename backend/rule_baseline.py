@@ -1,0 +1,12 @@
+RULE_BASELINE = {
+    "BANK_TIMEOUT": "RETRY_NOW",
+    "NETWORK_ERROR": "RETRY_NOW",
+    "INSUFFICIENT_FUNDS": "SEND_REMINDER",
+    "CARD_EXPIRED": "SEND_REMINDER",
+    "LIMIT_EXCEEDED": "RETRY_NOW",
+    "AUTHENTICATION_FAILED": "SEND_REMINDER",
+}
+
+
+def choose_rule_action(failure_code):
+    return RULE_BASELINE.get(failure_code, "NO_ACTION")

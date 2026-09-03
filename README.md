@@ -69,14 +69,21 @@ python -m pytest
 
 ## Running an Experiment
 
-To compare the AI Recovery Engine's performance against the baseline strategy:
+To compare the AI Recovery Engine's performance in a **3-Way Controlled Experiment** against both the Naive Baseline ("Always Retry") and the Heuristic Baseline ("Rule-Based"):
 ```bash
-python -m backend.run_experiment
+python backend/run_experiment.py
 ```
-This will output detailed metrics including total recoveries, revenue recovered, policy blocks, and the percentage improvement the AI drove over the baseline.
+This outputs detailed metrics including total recoveries, revenue recovered, policy compliance rates, action distribution, and the net financial improvement the AI engine drives over both baselines.
 
 ## Key Features
-- **Idempotency**: Prevents the same payment ID from being retried multiple times. If a duplicate is detected, the engine returns the previously `executed_action` without reprocessing.
-- **Audit Logging**: Every decision is logged to Postgres, including the AI's predicted probabilities, the expected value, whether the policy engine intervened, and the final executed action.
-- **Business Rule Enforcement**: The ML model maximizes recovery probability, but the Policy Engine ensures safe boundaries (e.g., stopping infinite retries or preventing risky high-value automated retries).
+- **Idempotency**: Prevents the same payment ID or recovery command from being executed multiple times across both Python and Go boundaries.
+- **Audit Logging**: Every decision and physical execution outcome is logged to PostgreSQL (`recovery_audit`), capturing probabilities, expected values, policy checks, attempts, and gateway statuses.
+- **Business Rule Enforcement**: The ML model recommends actions based on probability and expected value, but the Policy Engine enforces safety boundaries and fallbacks.
+- **Multi-Trial Trained ML**: Trained on 59,000+ repeated trials capturing ground-truth probability distributions across failure modes.
+
+## Engineering Reports & Benchmarks
+- [Benchmark & Performance Tracking (3-Way Multi-Seed Analysis)](docs/BENCHMARKS.md)
+- [2026-09-02 Engineering Day Report (V1 Go Execution Service)](docs/2026-09-02-v1-go-execution-day-report.md)
+- [2026-09-03 Session Report (Post-Execution Audit, Vectorization, 3-Way Experiments, Model Retraining)](docs/2026-09-03-session-report.md)
+
 

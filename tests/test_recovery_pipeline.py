@@ -49,3 +49,58 @@ def test_pipeline_processes_payment_and_persists_audit():
     assert stored is not None
     assert stored["payment_id"] == payment_id
     assert stored["executed_action"] == result["executed_action"]
+
+
+def test_pipeline_persists_execution_result_in_audit(monkeypatch):
+    pipeline = RecoveryPipeline(
+        go_executor_url="http://localhost:8080",
+    )
+
+    monkeypatch.setattr(
+        pipeline.audit_repository,
+        "claim_payment",
+        lambda payment_id: True,
+    )
+
+    saved_events = []
+
+    monkeypatch.setattr(
+        pipeline.audit_repository,
+        "save",
+        lambda event: saved_events.append(event),
+    )
+
+    monkeypatch.setattr(
+        pipeline.go_executor,
+        "execute",
+        lambda command: {
+            "status": "SUCCESS",
+            "action": "RETRY_LATER",
+            "outcome": "EXECUTED",
+            "attempts": 2,
+            "recovered": True,
+            "retryable": False,
+        },
+    )
+
+    result = pipeline.process_payment(
+        payment_id="audit-pipeline-001",
+        customer_id="customer-123",
+        amount=5000,
+        failure_code="BANK_TIMEOUT",
+        success_rate=0.8,
+        recovery_rate=0.6,
+        payment_method="UPI",
+        bank="HDFC",
+    )
+
+    assert result["recovered"] is True
+
+    assert len(saved_events) == 1
+
+    event = saved_events[0]
+
+    assert event["outcome"] == "EXECUTED"
+    assert event["attempts"] == 2
+    assert event["recovered"] is True
+    assert event["retryable"] is False

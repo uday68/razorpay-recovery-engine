@@ -1,0 +1,18 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Large ML model binaries
+ml/model.pkl
+*.pkl
+
+# Compiled Go binaries
+*.exe
+backend/go-executor/recovery-executor.exe
+
+# Testing caches
+.pytest_cache/
+
+# Environments
+.env

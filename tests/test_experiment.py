@@ -24,20 +24,19 @@ def test_experiment_return_recovery_metrics():
             writer.writeheader()
             writer.writerows(rows)
     
-    # Train and save model to default location
-    model_path = Path(__file__).parent.parent / "ml" / "model.pkl"
+    # Train model
     df = pd.read_csv(data_path)
     X = df[["success_rate", "recovery_rate", "amount", "payment_method", "bank", "failure_code", "hour", "action"]]
     y = df["success"]
     
     pipeline = build_pipeline()
     pipeline.fit(X, y)
-    save_model(pipeline, model_path)
     
     try:
         result = run_recovery_experiment(
             customer_count=50,
             payment_count=200,
+            model=pipeline,
         )
 
         assert result["failed_payments"] > 0
