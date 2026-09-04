@@ -22,11 +22,11 @@ const (
 )
 
 func envOrDefault(name, fallback string) string {
-	if value := os.Getenv(name); value != "" {
-		return value
+	value := os.Getenv(name)
+	if value == "" {
+		return fallback
 	}
-
-	return fallback
+	return value
 }
 
 func buildRecoveryConsumer(

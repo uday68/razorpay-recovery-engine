@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=geist:wght@100..900&family=inter:wght@100..900&family=jetbrainsMono:wght@100..900&display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config={"darkMode":"class","theme":{"extend":{"colors":{"background":"#0d141d","primary":"#c0c1ff","surface-variant":"#2e353f","secondary-fixed-dim":"#4edea3","surface-container-lowest":"#080f17","on-surface-variant":"#c7c4d7","on-secondary-fixed-variant":"#005236","on-tertiary-container":"#002d40","tertiary-fixed":"#c4e7ff","outline-variant":"#464554","on-primary-fixed-variant":"#2f2ebe","on-tertiary-fixed":"#001e2c","on-error":"#690005","on-error-container":"#ffdad6","surface":"#0d141d","secondary":"#4edea3","inverse-on-surface":"#2a313b","surface-container-low":"#151c25","on-secondary":"#003824","tertiary":"#7bd0ff","error-container":"#93000a","surface-dim":"#0d141d","surface-container":"#192029","outline":"#908fa0","tertiary-fixed-dim":"#7bd0ff","inverse-surface":"#dce3f0","surface-container-highest":"#2e353f","on-tertiary":"#00354a","on-primary":"#1000a9","surface-tint":"#c0c1ff","surface-bright":"#333a44","on-primary-container":"#0d0096","primary-container":"#8083ff","secondary-fixed":"#6ffbbe","inverse-primary":"#494bd6","on-background":"#dce3f0","on-tertiary-fixed-variant":"#004c69","on-secondary-fixed":"#002113","tertiary-container":"#009bd1","error":"#ffb4ab","on-primary-fixed":"#07006c","secondary-container":"#00a572","primary-fixed":"#e1e0ff","primary-fixed-dim":"#c0c1ff","on-secondary-container":"#00311f","surface-container-high":"#232a34","on-surface":"#dce3f0"},"borderRadius":{"DEFAULT":"0.125rem","lg":"0.25rem","xl":"0.5rem","full":"0.75rem"},"spacing":{"space-2xs":"0.125rem","space-sm":"0.5rem","layout-margin-desktop":"1.5rem","space-xs":"0.25rem","table-cell-padding-x":"0.875rem","space-base":"1rem","space-xl":"1.5rem","space-lg":"1.25rem","space-3xl":"3rem","space-2xl":"2rem","layout-margin-compact":"1rem","table-cell-padding-y":"0.625rem","space-md":"0.75rem"},"fontFamily":{"headline-sm":["geist"],"body-lg":["inter"],"headline-md":["geist"],"badge-label":["jetbrainsMono"],"body-md":["inter"],"headline-lg":["geist"],"mono-metric-md":["jetbrainsMono"],"label-caps":["jetbrainsMono"],"display-lg":["geist"],"mono-code":["jetbrainsMono"],"body-sm":["inter"],"mono-metric-lg":["jetbrainsMono"]},"fontSize":{"headline-sm":["15px",{"lineHeight":"22px","letterSpacing":"-0.005em","fontWeight":"500"}],"body-lg":["14px",{"lineHeight":"20px","letterSpacing":"0em","fontWeight":"400"}],"headline-md":["18px",{"lineHeight":"26px","letterSpacing":"-0.01em","fontWeight":"600"}],"badge-label":["11px",{"lineHeight":"14px","letterSpacing":"0.02em","fontWeight":"500"}],"body-md":["13px",{"lineHeight":"18px","letterSpacing":"0em","fontWeight":"400"}],"headline-lg":["24px",{"lineHeight":"32px","letterSpacing":"-0.015em","fontWeight":"600"}],"mono-metric-md":["18px",{"lineHeight":"24px","letterSpacing":"-0.01em","fontWeight":"500"}],"label-caps":["10px",{"lineHeight":"14px","letterSpacing":"0.08em","fontWeight":"600"}],"display-lg":["32px",{"lineHeight":"40px","letterSpacing":"-0.02em","fontWeight":"600"}],"mono-code":["12px",{"lineHeight":"18px","letterSpacing":"0em","fontWeight":"400"}],"body-sm":["12px",{"lineHeight":"16px","letterSpacing":"0.01em","fontWeight":"400"}],"mono-metric-lg":["28px",{"lineHeight":"34px","letterSpacing":"-0.02em","fontWeight":"500"}]}}}}</script></head><body class="bg-background font-body-md text-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-lowest z-50 flex flex-col justify-between shadow-[0_1px_8px_rgba(0,0,0,0.5)]"><div class="flex flex-col flex-1 overflow-y-auto"><div class="h-14 px-space-base flex items-center gap-space-sm bg-surface-container-low"><div class="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center text-primary"><span class="material-symbols-outlined text-[18px]">security</span></div><div class="flex flex-col min-w-0"><span class="font-label-caps text-label-caps tracking-widest text-on-surface truncate uppercase">Recovery Control</span><span class="font-badge-label text-badge-label text-secondary truncate">TOWER CORE</span></div></div><div class="p-space-base flex flex-col gap-space-lg"><div class="flex flex-col gap-space-xs"><span class="px-space-xs font-label-caps text-label-caps uppercase text-outline">Recovery</span><nav class="flex flex-col gap-space-2xs" data-active-classes="bg-surface-container-high text-on-surface border-l-2 border-primary font-body-md text-body-md"><a class="flex items-center justify-between px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="overview" href="#"><span class="font-body-md text-body-md">Overview</span></a><a class="flex items-center justify-between px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="live-recovery" href="#"><span class="font-body-md text-body-md">Live Recovery</span><span class="px-space-xs py-space-2xs rounded-lg bg-secondary-container text-on-secondary-container font-badge-label text-badge-label">127/s</span></a><a class="flex items-center justify-between px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="payments" href="#"><span class="font-body-md text-body-md">Payments</span></a><a aria-current="page" class="flex items-center justify-between px-space-sm py-space-xs rounded-lg transition-colors bg-surface-container-high text-on-surface border-l-2 border-primary font-body-md text-body-md" data-path="experiments" href="#"><span class="font-body-md text-body-md font-medium text-on-surface">Experiments</span><span class="px-space-xs py-space-2xs rounded-lg bg-surface-container-high text-secondary font-badge-label text-badge-label">5 Seeds</span></a></nav></div><div class="flex flex-col gap-space-xs"><span class="px-space-xs font-label-caps text-label-caps uppercase text-outline">Intelligence</span><nav class="flex flex-col gap-space-2xs" data-active-classes="bg-surface-container-high text-on-surface border-l-2 border-primary font-body-md text-body-md"><a class="flex items-center justify-between px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="ai-decisions" href="#"><span class="font-body-md text-body-md">AI Decisions</span></a><a class="flex items-center justify-between px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="failure-analysis" href="#"><span class="font-body-md text-body-md">Failure Analysis</span></a><a class="flex items-center justify-between px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="customer-reliability" href="#"><span class="font-body-md text-body-md">Customer Reliability</span></a></nav></div><div class="flex flex-col gap-space-xs"><span class="px-space-xs font-label-caps text-label-caps uppercase text-outline">Operations</span><nav class="flex flex-col gap-space-2xs" data-active-classes="bg-surface-container-high text-on-surface border-l-2 border-primary font-body-md text-body-md"><a class="flex items-center justify-between px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="execution" href="#"><span class="font-body-md text-body-md">Execution</span></a><a class="flex items-center justify-between px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="policies" href="#"><span class="font-body-md text-body-md">Policies</span><span class="px-space-xs py-space-2xs rounded-lg bg-tertiary-container text-on-tertiary-container font-badge-label text-badge-label">Deterministic</span></a><a class="flex items-center justify-between px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="system-health" href="#"><span class="font-body-md text-body-md">System Health</span><span class="px-space-xs py-space-2xs rounded-lg bg-surface-container-high text-secondary font-badge-label text-badge-label">99.98%</span></a></nav></div><div class="flex flex-col gap-space-xs"><span class="px-space-xs font-label-caps text-label-caps uppercase text-outline">Developer</span><nav class="flex flex-col gap-space-2xs" data-active-classes="bg-surface-container-high text-on-surface border-l-2 border-primary font-body-md text-body-md"><a class="flex items-center justify-between px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="events" href="#"><span class="font-body-md text-body-md">Events</span></a><a class="flex items-center justify-between px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="api" href="#"><span class="font-body-md text-body-md">API</span></a><a class="flex items-center justify-between px-space-sm py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface transition-colors" data-path="audit-log" href="#"><span class="font-body-md text-body-md">Audit Log</span></a></nav></div></div></div><div class="p-space-base flex flex-col gap-space-sm bg-surface-container-lowest"><div class="flex items-center justify-between px-space-sm py-space-xs rounded-lg bg-surface-container-low"><div class="flex items-center gap-space-xs"><span class="w-2 h-2 rounded-full bg-secondary"></span><span class="font-badge-label text-badge-label text-on-surface">6/6 Pods Active</span></div><span class="font-mono-code text-mono-code text-secondary-fixed-dim">OK</span></div><div class="flex items-center justify-between px-space-sm py-space-xs rounded-lg bg-surface-container cursor-pointer"><div class="flex items-center gap-space-xs min-w-0"><span class="material-symbols-outlined text-[14px] text-tertiary">sync_alt</span><span class="font-mono-code text-mono-code text-on-surface truncate">v2.4.0-rc3</span></div><span class="font-badge-label text-badge-label text-on-tertiary-fixed-variant uppercase">Sim</span></div><div class="flex items-center gap-space-sm pt-space-xs"><div class="w-8 h-8 rounded-full bg-surface-container-high flex items-center justify-center text-primary"><span class="material-symbols-outlined text-[18px]">badge</span></div><div class="flex flex-col min-w-0"><span class="font-body-sm text-body-sm text-on-surface truncate">Ops Engineer</span><span class="font-label-caps text-label-caps text-outline truncate">HDFC Cluster</span></div></div></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-14 bg-surface-container-lowest/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.5)] z-40 flex items-center justify-between px-layout-margin-desktop"><div class="flex items-center gap-space-md"><div class="flex items-center gap-space-xs font-mono-code text-mono-code text-on-surface-variant"><span class="text-primary">cluster</span><span>/</span><span>recovery</span><span>/</span><span class="text-on-surface font-medium">experiments</span></div><div class="px-space-xs py-space-2xs rounded-lg bg-surface-container-high text-tertiary font-label-caps text-label-caps uppercase tracking-wider">Simulator Environment</div></div><div class="flex items-center gap-space-lg"><div class="relative flex items-center"><span class="material-symbols-outlined absolute left-space-sm text-outline text-[16px]">search</span><input class="w-80 h-8 pl-8 pr-space-base rounded-lg bg-surface-container-low text-on-surface placeholder-outline font-mono-code text-mono-code focus:outline-none focus:bg-surface-container-high" placeholder="Search payments, hashes, events (Cmd+K)..." type="text"/></div><div class="flex items-center gap-space-sm px-space-sm py-space-2xs rounded-lg bg-surface-container-low"><div class="flex items-center gap-space-2xs"><span class="w-2 h-2 rounded-full bg-secondary animate-pulse"></span><span class="font-badge-label text-badge-label text-secondary">SSE LIVE</span></div><span class="text-outline text-[10px]">|</span><span class="font-badge-label text-badge-label text-on-surface-variant">Lag: 14ms</span><span class="text-outline text-[10px]">|</span><span class="font-badge-label text-badge-label text-outline">v2.4.1</span></div><div class="flex items-center gap-space-md"><div class="relative flex items-center cursor-pointer"><span class="material-symbols-outlined text-on-surface-variant hover:text-on-surface text-[20px]">notifications</span><span class="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-primary-container"></span></div><div class="flex items-center gap-space-xs pl-space-sm"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div><div class="hidden xl:flex flex-col"><span class="font-body-sm text-body-sm text-on-surface">FinOps Lead</span><span class="font-label-caps text-label-caps text-outline">HDFC Gateway</span></div></div></div></div></header><main class="w-full pt-14 px-layout-margin-desktop bg-background min-h-screen"><div class="flex flex-col w-full">
+<!-- Screen Header (Scoped & Infrastructure Styled) -->
+<div class="flex flex-col gap-space-xs pb-space-lg">
+<div class="flex flex-wrap items-center justify-between gap-space-md">
+<div class="flex flex-col gap-space-2xs">
+<div class="flex items-center gap-space-sm">
+<span class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Recovery Policies</span>
+<span class="px-space-xs py-space-2xs rounded-lg bg-surface-container-high text-primary font-mono-code text-mono-code flex items-center gap-space-2xs shadow-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+            v3.1-deterministic
+          </span>
+<span class="font-mono-code text-mono-code text-outline flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">commit</span>
+            pol-d49e1a
+          </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-3xl">
+          Deterministic safety guardrails, strict rule precedence hierarchy, and low-latency execution policy enforcement. Governed by "AI recommends, Policy authorizes".
+        </p>
+</div>
+<!-- Header Global Controls -->
+<div class="flex items-center gap-space-sm">
+<div class="px-space-sm py-space-xs rounded-lg bg-surface-container-low flex items-center gap-space-xs shadow-sm">
+<span class="material-symbols-outlined text-[15px] text-secondary">verified_user</span>
+<span class="font-badge-label text-badge-label text-on-surface">GitOps Protected</span>
+<span class="text-outline text-[10px]">•</span>
+<span class="font-mono-code text-mono-code text-outline">main-evaluator</span>
+</div>
+<button class="h-8 px-space-sm rounded-lg bg-surface-container-high hover:bg-surface-bright text-on-surface font-body-sm text-body-sm flex items-center gap-space-xs transition-all shadow-sm active:scale-95" id="btn-replay-eval">
+<span class="material-symbols-outlined text-[16px] text-tertiary">history_toggle_off</span>
+<span>Replay 28.4k Ledger</span>
+</button>
+<button class="h-8 px-space-sm rounded-lg bg-primary hover:bg-inverse-primary text-on-primary font-body-sm text-body-sm font-medium flex items-center gap-space-xs transition-all shadow-sm active:scale-95">
+<span class="material-symbols-outlined text-[16px]">add_box</span>
+<span>Draft Policy PR</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Section 1: KPI Summary Telemetry Bar -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-space-sm pb-space-lg">
+<!-- Active Rules Card -->
+<div class="p-space-md rounded-xl bg-surface-container-low shadow-sm flex flex-col justify-between relative overflow-hidden">
+<div class="flex items-center justify-between pb-space-xs">
+<span class="font-label-caps text-label-caps text-outline uppercase tracking-wider">Active Rules</span>
+<span class="px-space-xs py-space-2xs rounded-lg bg-secondary/10 text-secondary font-badge-label text-badge-label">100% IN-MEMORY</span>
+</div>
+<div class="flex items-baseline gap-space-xs pt-space-xs">
+<span class="font-mono-metric-lg text-mono-metric-lg text-on-surface">14</span>
+<span class="font-mono-code text-mono-code text-outline">enforcing</span>
+</div>
+<div class="flex items-center justify-between pt-space-xs font-body-sm text-body-sm text-on-surface-variant">
+<span>Precedence slots: P0 – P4</span>
+<span class="font-mono-code text-mono-code text-secondary flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">shield</span> Strict
+        </span>
+</div>
+</div>
+<!-- Evaluation Latency -->
+<div class="p-space-md rounded-xl bg-surface-container-low shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between pb-space-xs">
+<span class="font-label-caps text-label-caps text-outline uppercase tracking-wider">Evaluation Latency</span>
+<span class="font-mono-code text-mono-code text-secondary flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">bolt</span> 0 Network I/O
+        </span>
+</div>
+<div class="flex items-baseline gap-space-xs pt-space-xs">
+<span class="font-mono-metric-lg text-mono-metric-lg text-secondary">6.4</span>
+<span class="font-mono-code text-mono-code text-secondary">ms</span>
+<span class="font-badge-label text-badge-label text-outline ml-auto">P99 TARGET < 10ms</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden mt-space-xs">
+<div class="bg-secondary h-full rounded-full" style="width: 64%;"></div>
+</div>
+</div>
+<!-- Total Evaluations (24h) -->
+<div class="p-space-md rounded-xl bg-surface-container-low shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between pb-space-xs">
+<span class="font-label-caps text-label-caps text-outline uppercase tracking-wider">Total Evaluations (24h)</span>
+<span class="font-badge-label text-badge-label text-tertiary">Real-time Stream</span>
+</div>
+<div class="flex items-baseline gap-space-xs pt-space-xs">
+<span class="font-mono-metric-lg text-mono-metric-lg text-on-surface">28,410</span>
+<span class="font-body-sm text-body-sm text-outline">txns</span>
+</div>
+<div class="flex items-center gap-space-xs pt-space-xs font-mono-code text-mono-code text-on-surface-variant">
+<span class="text-secondary">+12.4%</span>
+<span class="text-outline">vs yesterday cluster load</span>
+</div>
+</div>
+<!-- Pass Rate / Authorizations -->
+<div class="p-space-md rounded-xl bg-surface-container-low shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between pb-space-xs">
+<span class="font-label-caps text-label-caps text-outline uppercase tracking-wider">Authorizations</span>
+<span class="px-space-xs py-space-2xs rounded-lg bg-secondary/15 text-secondary font-badge-label text-badge-label font-mono-code">PASS</span>
+</div>
+<div class="flex items-baseline justify-between pt-space-xs">
+<span class="font-mono-metric-lg text-mono-metric-lg text-on-surface">95.2%</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">27,046 tx</span>
+</div>
+<div class="w-full bg-surface-container-highest h-1 rounded-full overflow-hidden mt-space-xs">
+<div class="bg-secondary h-full rounded-full" style="width: 95.2%;"></div>
+</div>
+</div>
+<!-- Safety Interventions / Overrides -->
+<div class="p-space-md rounded-xl bg-surface-container-low shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between pb-space-xs">
+<span class="font-label-caps text-label-caps text-outline uppercase tracking-wider">Safety Overrides</span>
+<span class="px-space-xs py-space-2xs rounded-lg bg-error/15 text-error font-badge-label text-badge-label font-mono-code">BLOCKED / MUTED</span>
+</div>
+<div class="flex items-baseline justify-between pt-space-xs">
+<span class="font-mono-metric-lg text-mono-metric-lg text-error">4.8%</span>
+<span class="font-mono-code text-mono-code text-error">1,364 tx</span>
+</div>
+<div class="flex items-center justify-between pt-space-xs font-body-sm text-body-sm text-outline">
+<span>Prevented bank penalties</span>
+<span class="font-mono-code text-mono-code text-tertiary">₹421k save</span>
+</div>
+</div>
+</div>
+<!-- Master Layout: Deterministic Rule Matrix (Left/Center) + Policy Inspector Drawer (Right) -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-start pb-space-3xl">
+<!-- LEFT 7/8 COLUMNS: Rule Precedence Hierarchy & Ledger Table -->
+<div class="xl:col-span-8 flex flex-col gap-space-md">
+<!-- Table Controls & Filter Bar -->
+<div class="p-space-sm rounded-xl bg-surface-container-low shadow-sm flex flex-wrap items-center justify-between gap-space-sm">
+<div class="flex items-center gap-space-xs">
+<span class="font-label-caps text-label-caps text-outline uppercase px-space-xs">Precedence Tier</span>
+<div class="inline-flex rounded-lg bg-surface-container p-0.5">
+<button class="px-space-sm py-space-2xs rounded-lg bg-surface-container-high text-on-surface font-badge-label text-badge-label">All (6)</button>
+<button class="px-space-sm py-space-2xs rounded-lg hover:bg-surface-container-high text-on-surface-variant font-badge-label text-badge-label">P0 Fraud</button>
+<button class="px-space-sm py-space-2xs rounded-lg hover:bg-surface-container-high text-on-surface-variant font-badge-label text-badge-label">P1 Circuit</button>
+<button class="px-space-sm py-space-2xs rounded-lg hover:bg-surface-container-high text-on-surface-variant font-badge-label text-badge-label">P2 Codes</button>
+<button class="px-space-sm py-space-2xs rounded-lg hover:bg-surface-container-high text-on-surface-variant font-badge-label text-badge-label">P3/P4 Limits</button>
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+<div class="flex items-center gap-space-xs px-space-sm py-1 rounded-lg bg-surface-container">
+<span class="material-symbols-outlined text-[14px] text-outline">filter_alt</span>
+<span class="font-mono-code text-mono-code text-on-surface-variant">mode: STRICT_DETERMINISTIC</span>
+</div>
+<span class="text-outline text-[12px]">|</span>
+<span class="font-badge-label text-badge-label text-secondary flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> Evaluator Ready
+          </span>
+</div>
+</div>
+<!-- Policy Rules List / High Density Table Cards -->
+<div class="flex flex-col gap-space-xs">
+<!-- RULE P0 - Rule 01 (Critical Fraud Guardrail) -->
+<div class="p-space-base rounded-xl bg-surface-container-low shadow-sm flex flex-col gap-space-sm relative group hover:bg-surface-container transition-all">
+<div class="flex flex-wrap items-center justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm">
+<span class="px-space-xs py-space-2xs rounded-lg bg-error-container text-error font-badge-label text-badge-label tracking-wide uppercase font-mono-code">
+                P0 Critical
+              </span>
+<span class="font-headline-sm text-headline-sm text-on-surface">POL-01: Fraud & Blacklist Guardrail</span>
+<span class="px-space-xs py-space-2xs rounded-lg bg-surface-container-high text-outline font-label-caps text-label-caps uppercase">Hard Wall</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="font-mono-code text-mono-code text-error flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px]">block</span>
+                18 overrides (24h)
+              </span>
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="font-badge-label text-badge-label text-secondary uppercase">Active</span>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-space-sm pt-space-2xs font-mono-code text-mono-code text-body-sm">
+<div class="md:col-span-5 flex flex-col gap-0.5">
+<span class="font-label-caps text-label-caps text-outline uppercase">Trigger Predicate</span>
+<span class="text-error bg-surface-container-lowest px-space-xs py-1 rounded font-mono-code break-all">
+                customer.risk_score > 85 || blacklist.matches(cust_id)
+              </span>
+</div>
+<div class="md:col-span-4 flex flex-col gap-0.5">
+<span class="font-label-caps text-label-caps text-outline uppercase">Enforced Resolution</span>
+<span class="text-on-surface bg-surface-container-lowest px-space-xs py-1 rounded font-mono-code flex items-center gap-1">
+<span class="text-error">FORCE NO_ACTION</span> (AI Mute)
+              </span>
+</div>
+<div class="md:col-span-3 flex flex-col items-end justify-center">
+<span class="font-label-caps text-label-caps text-outline uppercase">Evaluation Volume</span>
+<span class="font-mono-metric-md text-mono-metric-md text-on-surface">28,410 <span class="font-mono-code text-[11px] text-outline">runs</span></span>
+</div>
+</div>
+<div class="flex items-center justify-between pt-space-xs text-on-surface-variant font-body-sm text-body-sm">
+<span class="text-outline">Precedence hierarchy #1. Absolute priority over downstream Thompson bandit models.</span>
+<span class="text-tertiary font-mono-code text-[11px] cursor-pointer hover:underline flex items-center gap-1">
+              Trace Ruleset <span class="material-symbols-outlined text-[13px]">arrow_forward</span>
+</span>
+</div>
+</div>
+<!-- RULE P1 - Rule 02 (Bank 504 / Circuit Breaker) -->
+<div class="p-space-base rounded-xl bg-surface-container-low shadow-sm flex flex-col gap-space-sm relative group hover:bg-surface-container transition-all">
+<div class="flex flex-wrap items-center justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm">
+<span class="px-space-xs py-space-2xs rounded-lg bg-surface-container-highest text-secondary-fixed-dim font-badge-label text-badge-label tracking-wide uppercase font-mono-code">
+                P1 Circuit
+              </span>
+<span class="font-headline-sm text-headline-sm text-on-surface">POL-02: Bank Gateway Surge & 504 Circuit Breaker</span>
+<span class="px-space-xs py-space-2xs rounded-lg bg-surface-container-high text-tertiary font-label-caps text-label-caps uppercase">Telemetry Driven</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="font-mono-code text-mono-code text-primary flex items-center gap-1">
+<span class="material-symbols-outlined text-[15px]">electric_bolt</span>
+                412 triggers today
+              </span>
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="font-badge-label text-badge-label text-secondary uppercase">Active</span>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-space-sm pt-space-2xs font-mono-code text-mono-code text-body-sm">
+<div class="md:col-span-5 flex flex-col gap-0.5">
+<span class="font-label-caps text-label-caps text-outline uppercase">Trigger Predicate</span>
+<span class="text-tertiary bg-surface-container-lowest px-space-xs py-1 rounded font-mono-code break-all">
+                gateway.failure_rate > 0.25 || spike(gateway.504_codes)
+              </span>
+</div>
+<div class="md:col-span-4 flex flex-col gap-0.5">
+<span class="font-label-caps text-label-caps text-outline uppercase">Enforced Resolution</span>
+<span class="text-on-surface bg-surface-container-lowest px-space-xs py-1 rounded font-mono-code">
+                DISALLOW RETRY_NOW → <span class="text-secondary">RETRY_LATER (min 240s)</span>
+</span>
+</div>
+<div class="md:col-span-3 flex flex-col items-end justify-center">
+<span class="font-label-caps text-label-caps text-outline uppercase">Evaluation Volume</span>
+<span class="font-mono-metric-md text-mono-metric-md text-on-surface">28,410 <span class="font-mono-code text-[11px] text-outline">runs</span></span>
+</div>
+</div>
+<div class="flex items-center justify-between pt-space-xs text-on-surface-variant font-body-sm text-body-sm">
+<span class="text-outline">Protects merchant PSP status and avoids cascading bank gateway rate throttling.</span>
+<span class="text-secondary font-mono-code text-[11px] flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">speed</span> HDFC Load: 18.2% (Norm)
+            </span>
+</div>
+</div>
+<!-- RULE P2 - Rule 03 (Hard Failure Non-Retryability) -->
+<div class="p-space-base rounded-xl bg-surface-container-low shadow-sm flex flex-col gap-space-sm relative group hover:bg-surface-container transition-all">
+<div class="flex flex-wrap items-center justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm">
+<span class="px-space-xs py-space-2xs rounded-lg bg-surface-container-highest text-tertiary font-badge-label text-badge-label tracking-wide uppercase font-mono-code">
+                P2 Hard Code
+              </span>
+<span class="font-headline-sm text-headline-sm text-on-surface">POL-03: Hard Failure Non-Retryability Classification</span>
+<span class="px-space-xs py-space-2xs rounded-lg bg-surface-container-high text-outline font-label-caps text-label-caps uppercase">ISO-8583 Code</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="font-mono-code text-mono-code text-outline">588 redirected (24h)</span>
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="font-badge-label text-badge-label text-secondary uppercase">Active</span>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-space-sm pt-space-2xs font-mono-code text-mono-code text-body-sm">
+<div class="md:col-span-5 flex flex-col gap-0.5">
+<span class="font-label-caps text-label-caps text-outline uppercase">Trigger Predicate</span>
+<span class="text-primary bg-surface-container-lowest px-space-xs py-1 rounded font-mono-code break-all">
+                failure_code IN [CARD_EXPIRED, INVALID_ACCOUNT, AUTH_FAIL]
+              </span>
+</div>
+<div class="md:col-span-4 flex flex-col gap-0.5">
+<span class="font-label-caps text-label-caps text-outline uppercase">Enforced Resolution</span>
+<span class="text-on-surface bg-surface-container-lowest px-space-xs py-1 rounded font-mono-code">
+                BLOCK RETRY → <span class="text-tertiary">FORCE SEND_REMINDER</span>
+</span>
+</div>
+<div class="md:col-span-3 flex flex-col items-end justify-center">
+<span class="font-label-caps text-label-caps text-outline uppercase">Evaluation Volume</span>
+<span class="font-mono-metric-md text-mono-metric-md text-on-surface">28,410 <span class="font-mono-code text-[11px] text-outline">runs</span></span>
+</div>
+</div>
+<div class="flex items-center justify-between pt-space-xs text-on-surface-variant font-body-sm text-body-sm">
+<span class="text-outline">Terminal errors require explicit customer card rotation or re-authentication.</span>
+<span class="font-mono-code text-[11px] text-outline">Latency < 0.2ms</span>
+</div>
+</div>
+<!-- RULE P3 - Rule 04 (Retry Velocity & Attempt Cap) -->
+<div class="p-space-base rounded-xl bg-surface-container-low shadow-sm flex flex-col gap-space-sm relative group hover:bg-surface-container transition-all">
+<div class="flex flex-wrap items-center justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm">
+<span class="px-space-xs py-space-2xs rounded-lg bg-surface-container-highest text-on-surface font-badge-label text-badge-label tracking-wide uppercase font-mono-code">
+                P3 Velocity
+              </span>
+<span class="font-headline-sm text-headline-sm text-on-surface">POL-04: Retry Velocity & Attempt Cap (Fatigue Limit)</span>
+<span class="px-space-xs py-space-2xs rounded-lg bg-surface-container-high text-outline font-label-caps text-label-caps uppercase">Safety Cap</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="font-mono-code text-mono-code text-outline">211 caps hit (24h)</span>
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="font-badge-label text-badge-label text-secondary uppercase">Active</span>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-space-sm pt-space-2xs font-mono-code text-mono-code text-body-sm">
+<div class="md:col-span-5 flex flex-col gap-0.5">
+<span class="font-label-caps text-label-caps text-outline uppercase">Trigger Predicate</span>
+<span class="text-on-surface bg-surface-container-lowest px-space-xs py-1 rounded font-mono-code break-all">
+                payment.attempt_count >= 3 (sliding_window: 24h)
+              </span>
+</div>
+<div class="md:col-span-4 flex flex-col gap-0.5">
+<span class="font-label-caps text-label-caps text-outline uppercase">Enforced Resolution</span>
+<span class="text-on-surface bg-surface-container-lowest px-space-xs py-1 rounded font-mono-code">
+                DISALLOW ALL RETRIES → <span class="text-error">EXHAUSTED</span>
+</span>
+</div>
+<div class="md:col-span-3 flex flex-col items-end justify-center">
+<span class="font-label-caps text-label-caps text-outline uppercase">Evaluation Volume</span>
+<span class="font-mono-metric-md text-mono-metric-md text-on-surface">28,410 <span class="font-mono-code text-[11px] text-outline">runs</span></span>
+</div>
+</div>
+<div class="flex items-center justify-between pt-space-xs text-on-surface-variant font-body-sm text-body-sm">
+<span class="text-outline">Guarantees zero payment fatigue and complies with RBI consumer notification regulations.</span>
+<span class="font-badge-label text-badge-label text-secondary">SLIDING WINDOW OK</span>
+</div>
+</div>
+<!-- RULE P4 - Rule 05 (Economic Viability Floor) -->
+<div class="p-space-base rounded-xl bg-surface-container-low shadow-sm flex flex-col gap-space-sm relative group hover:bg-surface-container transition-all">
+<div class="flex flex-wrap items-center justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm">
+<span class="px-space-xs py-space-2xs rounded-lg bg-surface-container-highest text-primary font-badge-label text-badge-label tracking-wide uppercase font-mono-code">
+                P4 Economics
+              </span>
+<span class="font-headline-sm text-headline-sm text-on-surface">POL-05: Economic Viability & Confidence Floor</span>
+<span class="px-space-xs py-space-2xs rounded-lg bg-surface-container-high text-primary font-label-caps text-label-caps uppercase">ROI Gate</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="font-mono-code text-mono-code text-outline">135 dropped (24h)</span>
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="font-badge-label text-badge-label text-secondary uppercase">Active</span>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-space-sm pt-space-2xs font-mono-code text-mono-code text-body-sm">
+<div class="md:col-span-5 flex flex-col gap-0.5">
+<span class="font-label-caps text-label-caps text-outline uppercase">Trigger Predicate</span>
+<span class="text-primary bg-surface-container-lowest px-space-xs py-1 rounded font-mono-code break-all">
+                ai.confidence < 0.50 || expected_value(EV) <= 0.00
+              </span>
+</div>
+<div class="md:col-span-4 flex flex-col gap-0.5">
+<span class="font-label-caps text-label-caps text-outline uppercase">Enforced Resolution</span>
+<span class="text-on-surface bg-surface-container-lowest px-space-xs py-1 rounded font-mono-code">
+                BLOCK RETRY_NOW → <span class="text-on-surface-variant">PASSIVE_DROP</span>
+</span>
+</div>
+<div class="md:col-span-3 flex flex-col items-end justify-center">
+<span class="font-label-caps text-label-caps text-outline uppercase">Evaluation Volume</span>
+<span class="font-mono-metric-md text-mono-metric-md text-on-surface">28,410 <span class="font-mono-code text-[11px] text-outline">runs</span></span>
+</div>
+</div>
+<div class="flex items-center justify-between pt-space-xs text-on-surface-variant font-body-sm text-body-sm">
+<span class="text-outline">Floor: Min 50.0% ML model precision and net positive expected gateway fee return.</span>
+<span class="font-mono-code text-[11px] text-primary">Floor: 50.0% Conf</span>
+</div>
+</div>
+<!-- RULE P4 - Rule 06 (Customer Outreach Throttle) -->
+<div class="p-space-base rounded-xl bg-surface-container-low shadow-sm flex flex-col gap-space-sm relative group hover:bg-surface-container transition-all">
+<div class="flex flex-wrap items-center justify-between gap-space-xs">
+<div class="flex items-center gap-space-sm">
+<span class="px-space-xs py-space-2xs rounded-lg bg-surface-container-highest text-primary font-badge-label text-badge-label tracking-wide uppercase font-mono-code">
+                P4 Economics
+              </span>
+<span class="font-headline-sm text-headline-sm text-on-surface">POL-06: Customer Outreach Throttle (Anti-Spam)</span>
+<span class="px-space-xs py-space-2xs rounded-lg bg-surface-container-high text-outline font-label-caps text-label-caps uppercase">Channel Cap</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<span class="font-mono-code text-mono-code text-outline">89 throttled (24h)</span>
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="font-badge-label text-badge-label text-secondary uppercase">Active</span>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-space-sm pt-space-2xs font-mono-code text-mono-code text-body-sm">
+<div class="md:col-span-5 flex flex-col gap-0.5">
+<span class="font-label-caps text-label-caps text-outline uppercase">Trigger Predicate</span>
+<span class="text-primary bg-surface-container-lowest px-space-xs py-1 rounded font-mono-code break-all">
+                channel_outreach_count >= 1 (window: 12 hours)
+              </span>
+</div>
+<div class="md:col-span-4 flex flex-col gap-0.5">
+<span class="font-label-caps text-label-caps text-outline uppercase">Enforced Resolution</span>
+<span class="text-on-surface bg-surface-container-lowest px-space-xs py-1 rounded font-mono-code">
+                MUTE SMS / WHATSAPP → <span class="text-outline">EMAIL_FALLBACK</span>
+</span>
+</div>
+<div class="md:col-span-3 flex flex-col items-end justify-center">
+<span class="font-label-caps text-label-caps text-outline uppercase">Evaluation Volume</span>
+<span class="font-mono-metric-md text-mono-metric-md text-on-surface">11,204 <span class="font-mono-code text-[11px] text-outline">runs</span></span>
+</div>
+</div>
+<div class="flex items-center justify-between pt-space-xs text-on-surface-variant font-body-sm text-body-sm">
+<span class="text-outline">Limits intrusive WhatsApp/SMS nudge frequency per user profile.</span>
+<span class="font-mono-code text-[11px] text-secondary">Anti-Fatigue Guard: Enabled</span>
+</div>
+</div>
+</div>
+<!-- Execution Precedence Hierarchy Visual Diagram -->
+<div class="p-space-base rounded-xl bg-surface-container-low shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<span class="font-label-caps text-label-caps text-outline uppercase tracking-wider">Evaluation Cascade Execution Flow</span>
+<span class="font-mono-code text-mono-code text-outline">Short-circuit evaluation enabled</span>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-5 gap-space-xs text-center font-mono-code text-mono-code text-body-sm pt-space-xs">
+<div class="p-space-xs rounded-lg bg-surface-container flex flex-col items-center gap-1">
+<span class="text-error font-badge-label text-badge-label uppercase">Step 1: P0</span>
+<span class="text-on-surface">Fraud Filter</span>
+<span class="text-secondary text-[11px]">→ 0.4ms</span>
+</div>
+<div class="p-space-xs rounded-lg bg-surface-container flex flex-col items-center gap-1">
+<span class="text-secondary-fixed-dim font-badge-label text-badge-label uppercase">Step 2: P1</span>
+<span class="text-on-surface">Circuit State</span>
+<span class="text-secondary text-[11px]">→ 0.8ms</span>
+</div>
+<div class="p-space-xs rounded-lg bg-surface-container flex flex-col items-center gap-1">
+<span class="text-tertiary font-badge-label text-badge-label uppercase">Step 3: P2</span>
+<span class="text-on-surface">Code Compat</span>
+<span class="text-secondary text-[11px]">→ 0.2ms</span>
+</div>
+<div class="p-space-xs rounded-lg bg-surface-container flex flex-col items-center gap-1">
+<span class="text-on-surface font-badge-label text-badge-label uppercase">Step 4: P3</span>
+<span class="text-on-surface">Velocity Cap</span>
+<span class="text-secondary text-[11px]">→ 1.1ms</span>
+</div>
+<div class="p-space-xs rounded-lg bg-surface-container flex flex-col items-center gap-1">
+<span class="text-primary font-badge-label text-badge-label uppercase">Step 5: P4</span>
+<span class="text-on-surface">EV & Spam Floor</span>
+<span class="text-secondary text-[11px]">→ 0.9ms</span>
+</div>
+</div>
+</div>
+</div>
+<!-- RIGHT 4/12 COLUMNS: Policy Evaluation Inspector (Live Trace & Simulation) -->
+<div class="xl:col-span-4 flex flex-col gap-space-md sticky top-16">
+<!-- Live Evaluation Trace Card -->
+<div class="rounded-xl bg-surface-container-low shadow-xl flex flex-col overflow-hidden">
+<!-- Inspector Title Bar -->
+<div class="px-space-base py-space-sm bg-surface-container flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-[18px] text-tertiary">analytics</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Policy Evaluation Inspector</span>
+</div>
+<span class="px-space-xs py-space-2xs rounded-lg bg-surface-container-high text-secondary font-mono-code text-mono-code">
+            LIVE TRACE
+          </span>
+</div>
+<!-- Banner Doctrine: AI Recommends. Policy Authorizes. -->
+<div class="px-space-base py-space-xs bg-surface-container-high flex items-center justify-between text-on-surface-variant font-mono-code text-mono-code">
+<span class="text-outline">Principle:</span>
+<span class="text-on-surface font-medium">"AI recommends. Policy authorizes."</span>
+</div>
+<div class="p-space-base flex flex-col gap-space-md">
+<!-- Incident Context Block -->
+<div class="flex flex-col gap-space-xs p-space-sm rounded-lg bg-surface-container-lowest">
+<div class="flex items-center justify-between font-mono-code text-mono-code text-on-surface">
+<span class="text-primary font-medium">pay_9281</span>
+<span class="text-on-surface">₹5,000.00</span>
+</div>
+<div class="flex items-center justify-between font-mono-code text-mono-code text-outline text-[11px]">
+<span>Customer: <span class="text-on-surface-variant">cust_10492 (Prime)</span></span>
+<span>Prior Fails: <span class="text-secondary">0 today</span></span>
+</div>
+<div class="flex items-center justify-between font-mono-code text-mono-code text-[11px] pt-1">
+<span class="text-outline">Gateway: <span class="text-tertiary">HDFC UPI</span></span>
+<span class="text-error bg-surface-container-highest px-1 rounded">BANK_TIMEOUT</span>
+</div>
+</div>
+<!-- Step 1: AI Recommendation Ingestion -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-caps text-label-caps text-outline uppercase">Step 1: AI Model Proposal</span>
+<span class="font-mono-code text-mono-code text-tertiary text-[11px]">Bandit v2.4</span>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-lowest flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-mono-code text-mono-code text-on-surface font-medium">Recommended: RETRY_LATER</span>
+<span class="px-space-xs py-space-2xs rounded-lg bg-primary/20 text-primary font-mono-code text-mono-code">65.0% Conf</span>
+</div>
+<div class="flex items-center justify-between font-mono-code text-mono-code text-[11px] text-outline">
+<span>Expected Value (EV): <span class="text-secondary">₹3,248.20</span></span>
+<span>Backoff: <span class="text-on-surface">240s</span></span>
+</div>
+<!-- Model comparison micro-ledger -->
+<div class="pt-1 flex items-center justify-between font-mono-code text-mono-code text-[11px] text-outline">
+<span>Alternative: RETRY_NOW</span>
+<span class="text-outline">Conf: 42.0% | EV: ₹2,098.20</span>
+</div>
+</div>
+</div>
+<!-- Step 2: Deterministic Rule Matrix Execution -->
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-caps text-label-caps text-outline uppercase">Step 2: Sequential Policy Matrix</span>
+<span class="font-badge-label text-badge-label text-secondary">5/5 PASS</span>
+</div>
+<div class="flex flex-col gap-1 font-mono-code text-mono-code text-[11px]">
+<!-- Rule P0 Eval -->
+<div class="p-space-xs rounded bg-surface-container-lowest flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="px-1 py-0.5 rounded bg-secondary/15 text-secondary font-bold text-[9px]">PASS</span>
+<span class="text-on-surface">Rule P0: Fraud Check</span>
+</div>
+<span class="text-outline">Risk: 12 ≤ 85 → <span class="text-secondary">ALLOW</span></span>
+</div>
+<!-- Rule P1 Eval -->
+<div class="p-space-xs rounded bg-surface-container-lowest flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="px-1 py-0.5 rounded bg-secondary/15 text-secondary font-bold text-[9px]">PASS</span>
+<span class="text-on-surface">Rule P1: Bank Circuit</span>
+</div>
+<span class="text-outline">Rate: 18% < 25% → <span class="text-secondary">ALLOW</span></span>
+</div>
+<!-- Rule P2 Eval -->
+<div class="p-space-xs rounded bg-surface-container-lowest flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="px-1 py-0.5 rounded bg-secondary/15 text-secondary font-bold text-[9px]">PASS</span>
+<span class="text-on-surface">Rule P2: Code Check</span>
+</div>
+<span class="text-outline">BANK_TIMEOUT retryable → <span class="text-secondary">ALLOW</span></span>
+</div>
+<!-- Rule P3 Eval -->
+<div class="p-space-xs rounded bg-surface-container-lowest flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="px-1 py-0.5 rounded bg-secondary/15 text-secondary font-bold text-[9px]">PASS</span>
+<span class="text-on-surface">Rule P3: Attempt Cap</span>
+</div>
+<span class="text-outline">Attempt 1 of 3 → <span class="text-secondary">ALLOW</span></span>
+</div>
+<!-- Rule P4 Eval -->
+<div class="p-space-xs rounded bg-surface-container-lowest flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="px-1 py-0.5 rounded bg-secondary/15 text-secondary font-bold text-[9px]">PASS</span>
+<span class="text-on-surface">Rule P4: Economic Floor</span>
+</div>
+<span class="text-outline">EV ₹3.2k > 0, Conf 65% ≥ 50% → <span class="text-secondary">ALLOW</span></span>
+</div>
+</div>
+</div>
+<!-- Step 3: Final Policy Authorization Verdict -->
+<div class="p-space-sm rounded-lg bg-surface-container flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-caps text-label-caps text-outline uppercase">Final Verdict</span>
+<span class="px-space-xs py-space-2xs rounded-lg bg-secondary/20 text-secondary font-badge-label text-badge-label font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+                AUTHORIZED
+              </span>
+</div>
+<div class="flex items-center justify-between font-mono-code text-mono-code pt-1">
+<span class="text-outline">Authorized Action:</span>
+<span class="text-secondary font-medium">RETRY_LATER (240s Backoff)</span>
+</div>
+<div class="flex items-center justify-between font-mono-code text-mono-code text-[11px] text-outline">
+<span>Guardrail Mode: <span class="text-on-surface">100% Deterministic</span></span>
+<span>Total Latency: <span class="text-secondary">6.4ms</span></span>
+</div>
+<div class="pt-1 flex items-center justify-between font-mono-code text-mono-code text-[10px] text-outline">
+<span>Cryptographic Signature:</span>
+<span class="text-tertiary">pol_sig_8829aef02</span>
+</div>
+</div>
+<!-- Interactive Micro Simulator Bar -->
+<div class="p-space-sm rounded-lg bg-surface-container-lowest flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-caps text-label-caps text-primary uppercase flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">tune</span> Test Simulator Sandbox
+              </span>
+<span class="font-mono-code text-mono-code text-secondary text-[11px]" id="sim-status">Output: PASS</span>
+</div>
+<div class="grid grid-cols-2 gap-space-xs text-[11px] font-mono-code">
+<div>
+<label class="text-outline block mb-0.5">Failure Reason</label>
+<select class="w-full bg-surface-container rounded px-1.5 py-1 text-on-surface focus:outline-none" id="sim-failure">
+<option value="BANK_TIMEOUT">BANK_TIMEOUT</option>
+<option value="CARD_EXPIRED">CARD_EXPIRED</option>
+<option value="INVALID_ACCOUNT">INVALID_ACCOUNT</option>
+</select>
+</div>
+<div>
+<label class="text-outline block mb-0.5">Attempt Count</label>
+<select class="w-full bg-surface-container rounded px-1.5 py-1 text-on-surface focus:outline-none" id="sim-attempt">
+<option value="1">Attempt 1</option>
+<option value="2">Attempt 2</option>
+<option value="3">Attempt 3 (Limit)</option>
+<option value="4">Attempt 4 (Over)</option>
+</select>
+</div>
+</div>
+<div class="pt-1">
+<div class="flex justify-between text-[11px] font-mono-code text-outline pb-1">
+<span>Model Confidence:</span>
+<span class="text-on-surface" id="sim-conf-val">65%</span>
+</div>
+<input class="w-full accent-primary h-1 bg-surface-container rounded cursor-pointer" id="sim-conf" max="95" min="30" type="range" value="65"/>
+</div>
+<div class="p-space-xs rounded bg-surface-container text-body-sm font-mono-code text-[11px] text-on-surface-variant mt-1" id="sim-verdict-box">
+<span class="text-secondary font-medium">PASS:</span> All guardrails cleared. Action approved.
+            </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Action & Audit Bar -->
+<div class="fixed bottom-0 left-64 right-0 h-14 bg-surface-container-lowest/90 backdrop-blur-xl shadow-lg z-30 flex items-center justify-between px-layout-margin-desktop">
+<div class="flex items-center gap-space-md">
+<div class="flex items-center gap-space-xs font-mono-code text-mono-code text-on-surface-variant">
+<span class="text-outline">Evaluating Engine:</span>
+<span class="text-secondary">wasm-deterministic-core</span>
+<span class="text-outline text-[10px]">•</span>
+<span class="text-outline">Sync: <span class="text-on-surface">In-Sync (14ms)</span></span>
+</div>
+<div class="hidden md:flex items-center gap-space-xs">
+<span class="px-space-xs py-space-2xs rounded-lg bg-surface-container-high text-outline font-label-caps text-label-caps uppercase">Git Ref: 7f3b89c</span>
+</div>
+</div>
+<div class="flex items-center gap-space-sm">
+<button class="h-8 px-space-sm rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-mono-code text-mono-code flex items-center gap-space-xs transition-all shadow-sm">
+<span class="material-symbols-outlined text-[15px] text-tertiary">download</span>
+<span>Export .JSON</span>
+</button>
+<button class="h-8 px-space-sm rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-mono-code text-mono-code flex items-center gap-space-xs transition-all shadow-sm">
+<span class="material-symbols-outlined text-[15px] text-primary">data_object</span>
+<span>Export .YAML</span>
+</button>
+<button class="h-8 px-space-base rounded-lg bg-primary hover:bg-inverse-primary text-on-primary font-body-sm text-body-sm font-medium flex items-center gap-space-xs transition-all shadow-sm active:scale-95">
+<span class="material-symbols-outlined text-[16px]">rule</span>
+<span>Enforce Ruleset v3.1</span>
+</button>
+</div>
+</div>
+<!-- Inline Script for Policy Sandbox Micro-Interactions -->
+<script>
+    (function() {
+      const confSlider = document.getElementById('sim-conf');
+      const confVal = document.getElementById('sim-conf-val');
+      const failureSelect = document.getElementById('sim-failure');
+      const attemptSelect = document.getElementById('sim-attempt');
+      const verdictBox = document.getElementById('sim-verdict-box');
+      const statusPill = document.getElementById('sim-status');
+
+      function evaluateSimulation() {
+        const conf = parseInt(confSlider.value, 10);
+        const failCode = failureSelect.value;
+        const attempt = parseInt(attemptSelect.value, 10);
+
+        confVal.textContent = conf + '%';
+
+        // Check Hard Failure Code
+        if (failCode === 'CARD_EXPIRED' || failCode === 'INVALID_ACCOUNT') {
+          statusPill.textContent = 'INTERCEPT';
+          statusPill.className = 'font-mono-code text-mono-code text-error text-[11px]';
+          verdictBox.innerHTML = '<span class="text-error font-medium">Rule P2 TRIGGERED:</span> ' + failCode + ' is non-retryable. Blocked RETRY_NOW → Forcing SEND_REMINDER.';
+          return;
+        }
+
+        // Check Attempt Cap
+        if (attempt >= 4) {
+          statusPill.textContent = 'INTERCEPT';
+          statusPill.className = 'font-mono-code text-mono-code text-error text-[11px]';
+          verdictBox.innerHTML = '<span class="text-error font-medium">Rule P3 TRIGGERED:</span> Payment reached limit (attempt ' + attempt + ' ≥ 3). Forced NO_ACTION.';
+          return;
+        }
+
+        // Check Economic Confidence Floor
+        if (conf < 50) {
+          statusPill.textContent = 'INTERCEPT';
+          statusPill.className = 'font-mono-code text-mono-code text-primary text-[11px]';
+          verdictBox.innerHTML = '<span class="text-primary font-medium">Rule P4 TRIGGERED:</span> AI Confidence ' + conf + '% < 50.0% floor. Drop automated retry to preserve gateway fees.';
+          return;
+        }
+
+        // Pass State
+        statusPill.textContent = 'Output: PASS';
+        statusPill.className = 'font-mono-code text-mono-code text-secondary text-[11px]';
+        verdictBox.innerHTML = '<span class="text-secondary font-medium">PASS:</span> All guardrails cleared. Action RETRY_LATER authorized with 240s backoff.';
+      }
+
+      if (confSlider && failureSelect && attemptSelect) {
+        confSlider.addEventListener('input', evaluateSimulation);
+        failureSelect.addEventListener('change', evaluateSimulation);
+        attemptSelect.addEventListener('change', evaluateSimulation);
+      }
+
+      // Replay Ledger Micro interaction feedback
+      const replayBtn = document.getElementById('btn-replay-eval');
+      if (replayBtn) {
+        replayBtn.addEventListener('click', function() {
+          const originalHTML = replayBtn.innerHTML;
+          replayBtn.innerHTML = '<span class="material-symbols-outlined text-[16px] text-secondary animate-spin">sync</span><span>Evaluating 28,410 txns...</span>';
+          setTimeout(() => {
+            replayBtn.innerHTML = '<span class="material-symbols-outlined text-[16px] text-secondary">done_all</span><span>28,410 Verified (0 Divergence)</span>';
+            setTimeout(() => {
+              replayBtn.innerHTML = originalHTML;
+            }, 3000);
+          }, 800);
+        });
+      }
+    })();
+  </script>
+</div></main></div></body></html>

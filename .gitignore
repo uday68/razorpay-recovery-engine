@@ -16,3 +16,8 @@ backend/go-executor/recovery-executor.exe
 
 # Environments
 .env
+
+# Node / Frontend
+node_modules/
+dist/
+*.zip

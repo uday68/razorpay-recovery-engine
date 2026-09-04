@@ -1,14 +1,45 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Layout, PageId } from '../components/Layout';
+import Overview from '../pages/Overview';
+import LiveRecovery from '../pages/LiveRecovery';
+import PaymentInvestigation from '../pages/PaymentInvestigation';
+import Experiments from '../pages/Experiments';
+import AIIntelligence from '../pages/AIIntelligence';
+import Policies from '../pages/Policies';
+import SystemHealth from '../pages/SystemHealth';
+import AuditLog from '../pages/AuditLog';
 
 export const App: React.FC = () => {
+  const [currentPage, setCurrentPage] = useState<PageId>('overview');
+
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'overview':
+        return <Overview />;
+      case 'live-recovery':
+        return <LiveRecovery />;
+      case 'payments':
+        return <PaymentInvestigation />;
+      case 'experiments':
+        return <Experiments />;
+      case 'ai-decisions':
+        return <AIIntelligence />;
+      case 'policies':
+        return <Policies />;
+      case 'system-health':
+        return <SystemHealth />;
+      case 'audit-log':
+        return <AuditLog />;
+      default:
+        return <Overview />;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-900 text-white">
-      <header className="p-4 border-b border-slate-800">
-        <h1 className="text-xl font-bold">Razorpay Recovery Engine</h1>
-      </header>
-    </div>
+    <Layout currentPage={currentPage} setCurrentPage={setCurrentPage}>
+      {renderPage()}
+    </Layout>
   );
 };
 
 export default App;
-
