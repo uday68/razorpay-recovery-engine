@@ -109,65 +109,68 @@ export const Overview: React.FC = () => {
     });
   };
 
-  // 2. Simulate Batch Failure
-  const handleSimulateBatch = () => {
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const now = new Date();
-    const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now
-      .getMinutes()
-      .toString()
-      .padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}.${now
-      .getMilliseconds()
-      .toString()
-      .padStart(3, "0")}`;
-
-    const newSimulatedBatch: TransactionRowData[] = [
-      {
-        paymentId: `pay_sim_${randomSuffix}_hdfc`,
-        timestamp: timeStr,
-        method: "UPI",
-        bank: "HDFC",
-        amount: 3400.0,
-        failureCode: "BANK_TIMEOUT",
-        expectedValue: 272.0,
-        action: "RETRY_NOW",
-        status: "RECOVERED",
-      },
-      {
-        paymentId: `pay_sim_${randomSuffix}_sbi`,
-        timestamp: timeStr,
-        method: "NET_BANKING",
-        bank: "SBI",
-        amount: 8900.0,
-        failureCode: "GATEWAY_504",
-        expectedValue: 356.0,
-        action: "RETRY_LATER",
-        status: "ROUTING",
-      },
-      {
-        paymentId: `pay_sim_${randomSuffix}_icici`,
-        timestamp: timeStr,
-        method: "CARD",
-        bank: "ICICI",
-        amount: 18200.0,
-        failureCode: "NETWORK_SURGE",
-        expectedValue: 728.0,
-        action: "RETRY_LATER",
-        status: "PENDING",
-      },
-    ];
-
-    setTransactions((prev) => [...newSimulatedBatch, ...prev]);
-    setAtRiskRevenue((prev) => Number((prev + 0.30).toFixed(2)));
-    setRecoveredRevenue((prev) => Number((prev + 0.03).toFixed(2)));
-    setActiveInFlight((prev) => prev + 3);
-
+  // 2. Simulate Batch Failure (Now connected to real backend)
+  const handleSimulateBatch = async () => {
     addToast({
       id: Date.now().toString(),
       type: "info",
-      title: "[SIMULATION] Batch Failure Injected",
-      description: "Injected 3 simulated client-side test events across HDFC, SBI, and ICICI.",
+      title: "Batch Failure Injection Started",
+      description: "Routing 3 live events through the autonomous ML pipeline...",
     });
+
+    try {
+      // Fire 3 real injections in parallel (burst)
+      const results = await Promise.all([
+        recoveryApi.injectEvent(),
+        recoveryApi.injectEvent(),
+        recoveryApi.injectEvent()
+      ]);
+
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now
+        .getMinutes()
+        .toString()
+        .padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}.${now
+        .getMilliseconds()
+        .toString()
+        .padStart(3, "0")}`;
+
+      const newRows: TransactionRowData[] = results.map(result => {
+        const input = (result.input || {}) as Record<string, unknown>;
+        return {
+          paymentId:     String(result.payment_id || input.payment_id || "unknown"),
+          timestamp:     timeStr,
+          method:        String(input.payment_method || "UPI"),
+          bank:          String(input.bank || "UNKNOWN"),
+          amount:        Number(input.amount || 0),
+          failureCode:   String(input.failure_code || "UNKNOWN"),
+          expectedValue: Number(result.expected_value || 0),
+          action:        (result.executed_action || result.recommended_action || "NO_ACTION") as any,
+          status:        result.recovered ? "RECOVERED" : "FAILED",
+        };
+      });
+
+      // Show them immediately in local state
+      setTransactions((prev) => [...newRows, ...prev]);
+      
+      // The backend pipeline updates PG async; refresh summary after a short delay
+      setTimeout(fetchOverview, 1500);
+
+      addToast({
+        id: (Date.now() + 1).toString(),
+        type: "success",
+        title: "Batch Injection Complete",
+        description: `Successfully processed 3 events. ${newRows.filter(r => r.status === 'RECOVERED').length} recovered autonomously.`,
+      });
+    } catch (err) {
+      console.error("Failed to inject batch:", err);
+      addToast({
+        id: Date.now().toString(),
+        type: "error",
+        title: "Batch Injection Failed",
+        description: "Could not reach the AI Engine to inject events.",
+      });
+    }
   };
 
   // 3. Toggle Engine Mode
