@@ -55,6 +55,20 @@ class AuditRepository:
                     """
                 )
                 cursor.execute(
+                    """
+                    DELETE FROM recovery_audit duplicate
+                    USING recovery_audit keeper
+                    WHERE duplicate.payment_id = keeper.payment_id
+                      AND duplicate.id < keeper.id
+                    """
+                )
+                cursor.execute(
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS recovery_audit_payment_id_uidx
+                    ON recovery_audit (payment_id)
+                    """
+                )
+                cursor.execute(
                         """
                         CREATE TABLE IF NOT EXISTS recovery_idempotency (
                             payment_id TEXT PRIMARY KEY,
