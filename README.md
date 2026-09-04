@@ -269,6 +269,35 @@ Individual inclusion proofs are generated and independently verifiable.
 
 ---
 
+## Documentation
+
+### Architecture and Product
+
+- [Autonomous Payment Recovery Control Tower](Razorpay%20Autonomous%20Payment%20Recovery%20Control%20Tower.md) — product overview, system architecture, workflows, and operating model.
+- [V2 Architecture Roadmap](docs/V2_ARCHITECTURE_ROADMAP.md) — event-driven platform evolution and future architecture phases.
+- [Implemented Features](docs/IMPLEMENTED_FEATURES.md) — verified feature inventory with implementation and provenance references.
+- [Benchmarks](docs/BENCHMARKS.md) — recovery strategy comparisons, performance metrics, and multi-seed stability results.
+
+### Dashboards and Integration
+
+- [Dashboard Guide](docs/DASHBOARD_GUIDE.md) — purpose, APIs, data sources, and runtime requirements for all eight control-tower dashboards.
+- [Frontend/Backend Compatibility Report](docs/FRONTEND_BACKEND_COMPATIBILITY_REPORT.md) — frontend data contracts, endpoint mappings, and integration gaps.
+- [Full-Stack Integration Report](docs/FULL_STACK_INTEGRATION_PHASES_COMPLETE.md) — completed frontend, backend, database, and service integration phases.
+- [Zero Static Content and Full-Stack Integration Report](docs/ZERO_STATIC_CONTENT_AND_FULL_STACK_INTEGRATION_REPORT.md) — telemetry provenance and live-data verification.
+
+### Reliability and Event Processing
+
+- [Event Idempotency](docs/V2_5_EVENT_IDEMPOTENCY.md) — at-least-once Kafka delivery, duplicate prevention, and idempotent processing.
+- [Backend System and Model Performance Report](docs/BACKEND_SYSTEM_AND_MODEL_PERFORMANCE_REPORT.md) — backend services, model behavior, latency, and performance evidence.
+
+### Engineering History
+
+- [V1 Go Execution Day Report](docs/2026-09-02-v1-go-execution-day-report.md) — Go execution service, reliability controls, and the V1 boundary.
+- [September 3 Session Report](docs/2026-09-03-session-report.md) — executor evolution, audit boundary migration, experimentation, and model retraining.
+- [September 4 Session Report](docs/2026-09-04-session-report.md) — Kafka streaming, distributed idempotency, worker services, and frontend integration.
+
+---
+
 ## Technical Deep Dives
 
 <details>
