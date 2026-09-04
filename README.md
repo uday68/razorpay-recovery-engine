@@ -206,6 +206,7 @@ To scale beyond synchronous HTTP to handle **10,000 to 100,000 failed payments/s
 ---
 
 ## Engineering Reports & Benchmarks
+- [V2.5 Event Idempotency Specification (Dual-Layer Ingestion & Execution)](docs/V2_5_EVENT_IDEMPOTENCY.md)
 - [V2 Architecture Roadmap (Event-Driven Recovery Platform)](docs/V2_ARCHITECTURE_ROADMAP.md)
 - [Benchmark & Performance Tracking (3-Way Multi-Seed Analysis)](docs/BENCHMARKS.md)
 - [2026-09-02 Engineering Day Report (V1 Go Execution Service)](docs/2026-09-02-v1-go-execution-day-report.md)
