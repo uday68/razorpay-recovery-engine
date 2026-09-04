@@ -7,15 +7,20 @@ import { ConfidenceBar } from "../components/ui/ConfidenceBar";
 
 export const PaymentInvestigation: React.FC = () => {
   const [activePaymentId, setActivePaymentId] = useState("pay_rec_001");
+  const [recentTransactions, setRecentTransactions] = useState<string[]>([]);
   const [auditData, setAuditData] = useState<AuditDetailResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
   const fetchInvestigation = (id: string) => {
+    if (!id.trim()) return;
     setLoading(true);
     recoveryApi
-      .getAuditDetail(id)
+      .getAuditDetail(id.trim())
       .then((data) => {
-        if (data) setAuditData(data);
+        if (data) {
+          setAuditData(data);
+          setActivePaymentId(data.payment_id);
+        }
       })
       .catch((err) => {
         console.warn("Using offline audit detail:", err);
@@ -25,10 +30,12 @@ export const PaymentInvestigation: React.FC = () => {
 
   useEffect(() => {
     recoveryApi
-      .getTransactions({ limit: 1 })
+      .getTransactions({ limit: 6 })
       .then((txs) => {
         if (txs && txs.length > 0) {
-          const firstId = txs[0].paymentId;
+          const ids = txs.map((t) => t.paymentId);
+          setRecentTransactions(ids);
+          const firstId = ids[0];
           setActivePaymentId(firstId);
           fetchInvestigation(firstId);
         } else {
@@ -39,6 +46,12 @@ export const PaymentInvestigation: React.FC = () => {
         fetchInvestigation(activePaymentId);
       });
   }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      fetchInvestigation(activePaymentId);
+    }
+  };
 
   const rawJsonPayload = auditData
     ? JSON.stringify(auditData.raw_payload || auditData, null, 2)
@@ -51,36 +64,38 @@ export const PaymentInvestigation: React.FC = () => {
         2
       );
 
-  const stateSteps = auditData?.state_steps || [
-    {
-      step: "STEP 1: INGESTION",
-      time: auditData?.timestamp ? auditData.timestamp.slice(11, 23) : "13:30:12.821",
-      status: "PAYMENT_FAILED",
-      description: `${auditData?.bank || "HDFC"} ${auditData?.payment_method || "UPI"} ${auditData?.failure_code || "TIMEOUT"}`,
-      color: "error",
-    },
-    {
-      step: "STEP 2: INFERENCE",
-      time: "+1.2ms",
-      status: "AI_DECISION_ENGINE",
-      description: `P(Recovery) = ${(auditData?.probabilities?.[auditData?.recommended_action || "RETRY_NOW"] ?? 0.82).toFixed(2)}`,
-      color: "primary",
-    },
-    {
-      step: "STEP 3: SAFETY GATE",
-      time: "+4.8ms",
-      status: auditData?.policy_allowed ? "POLICY_GATE_PASSED" : "POLICY_RESTRICTED",
-      description: auditData?.policy_reason || "Breaker Closed / EV Threshold Met",
-      color: "secondary",
-    },
-    {
-      step: "STEP 4: DISPATCH",
-      time: "+240ms",
-      status: auditData?.recovered ? "RECOVERED_SUCCESS" : (auditData?.outcome || "EXECUTED"),
-      description: `Action: ${auditData?.executed_action || auditData?.recommended_action || "RETRY_NOW"}`,
-      color: auditData?.recovered ? "secondary" : "tertiary",
-    },
-  ];
+  const stateSteps = auditData?.state_steps && auditData.state_steps.length > 0
+    ? auditData.state_steps
+    : [
+        {
+          step: "STEP 1: INGESTION",
+          time: auditData?.timestamp ? auditData.timestamp.slice(11, 23) : "13:30:12.821",
+          status: "PAYMENT_FAILED",
+          description: `${auditData?.bank || "HDFC"} ${auditData?.payment_method || "UPI"} ${auditData?.failure_code || "TIMEOUT"}`,
+          color: "error",
+        },
+        {
+          step: "STEP 2: INFERENCE",
+          time: "+1.2ms",
+          status: "AI_DECISION_ENGINE",
+          description: `P(Recovery) = ${(auditData?.probabilities?.[auditData?.recommended_action || "RETRY_NOW"] ?? 0.82).toFixed(2)}`,
+          color: "primary",
+        },
+        {
+          step: "STEP 3: SAFETY GATE",
+          time: "+4.8ms",
+          status: auditData?.policy_allowed ? "POLICY_GATE_PASSED" : "POLICY_RESTRICTED",
+          description: auditData?.policy_reason || "Breaker Closed / EV Threshold Met",
+          color: "secondary",
+        },
+        {
+          step: "STEP 4: DISPATCH",
+          time: "+240ms",
+          status: auditData?.recovered ? "RECOVERED_SUCCESS" : (auditData?.outcome || "EXECUTED"),
+          description: `Action: ${auditData?.executed_action || auditData?.recommended_action || "RETRY_NOW"}`,
+          color: auditData?.recovered ? "secondary" : "tertiary",
+        },
+      ];
 
   const probabilities = auditData?.probabilities || {
     RETRY_NOW: 0.82,
@@ -99,11 +114,11 @@ export const PaymentInvestigation: React.FC = () => {
               Deep-Dive Transaction Forensics
             </span>
             <StatusPill
-              status={auditData?.recovered ? "RECOVERED" : "OPTIMAL"}
+              status={auditData?.recovered ? "RECOVERED" : (auditData?.outcome || "OPTIMAL")}
               label={loading ? "FETCHING LEDGER..." : "AUDIT VERIFIED"}
             />
           </div>
-          <h1 className="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight mt-1">
+          <h1 className="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight mt-1 truncate max-w-2xl">
             {activePaymentId}
           </h1>
         </div>
@@ -113,17 +128,42 @@ export const PaymentInvestigation: React.FC = () => {
             type="text"
             value={activePaymentId}
             onChange={(e) => setActivePaymentId(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Search Payment ID..."
-            className="px-space-sm py-1.5 rounded bg-surface-container border border-surface-container-high text-on-surface font-mono-code text-[12px] focus:outline-none focus:border-primary"
+            className="w-64 sm:w-80 px-space-sm py-1.5 rounded bg-surface-container border border-surface-container-high text-on-surface font-mono-code text-[12px] focus:outline-none focus:border-primary"
           />
           <button
             onClick={() => fetchInvestigation(activePaymentId)}
-            className="h-8 px-space-md rounded bg-primary text-on-primary font-badge-label text-badge-label font-semibold hover:bg-primary-container transition-colors cursor-pointer"
+            disabled={loading}
+            className="h-8 px-space-md rounded bg-primary text-on-primary font-badge-label text-badge-label font-semibold hover:bg-primary-container transition-colors cursor-pointer disabled:opacity-50"
           >
-            Investigate
+            {loading ? "Searching..." : "Investigate"}
           </button>
         </div>
       </div>
+
+      {/* Quick Recent Transaction Selector Chips */}
+      {recentTransactions.length > 0 && (
+        <div className="flex items-center gap-space-xs flex-wrap font-mono-code text-[11px] p-2 rounded bg-surface-container-low border border-surface-container-high">
+          <span className="text-outline text-[10px] uppercase font-semibold">Live Failure Stream:</span>
+          {recentTransactions.map((id) => (
+            <button
+              key={id}
+              onClick={() => {
+                setActivePaymentId(id);
+                fetchInvestigation(id);
+              }}
+              className={`px-2 py-0.5 rounded border transition-all cursor-pointer text-[11px] ${
+                id === activePaymentId
+                  ? "bg-primary/20 text-primary border-primary/50 font-bold shadow-sm"
+                  : "bg-surface-container hover:bg-surface-container-high text-on-surface-variant border-surface-container-high/60"
+              }`}
+            >
+              {id.length > 26 ? `${id.slice(0, 12)}...${id.slice(-8)}` : id}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-space-sm">
@@ -143,10 +183,10 @@ export const PaymentInvestigation: React.FC = () => {
           <span className="font-label-caps text-label-caps text-outline uppercase">
             Initial Failure Code
           </span>
-          <span className="font-mono-code text-error font-semibold mt-1">
+          <span className="font-mono-code text-error font-semibold mt-1 truncate">
             {auditData?.failure_code || "BANK_TIMEOUT"}
           </span>
-          <span className="font-body-sm text-[11px] text-outline mt-0.5">
+          <span className="font-body-sm text-[11px] text-outline mt-0.5 truncate">
             Customer: {auditData?.customer_id || "cust_live"}
           </span>
         </div>
@@ -171,7 +211,7 @@ export const PaymentInvestigation: React.FC = () => {
             <StatusPill status={auditData?.recovered ? "RECOVERED" : (auditData?.outcome || "PENDING")} />
           </div>
           <span className="font-body-sm text-[11px] text-outline mt-0.5">
-            Attempts: {auditData?.attempts ?? 1} / 3 Hops
+            Attempts: {auditData?.attempts ?? 1} / 3 Hops Cap
           </span>
         </div>
       </div>
@@ -241,7 +281,7 @@ export const PaymentInvestigation: React.FC = () => {
           <p className="font-body-sm text-body-sm text-outline">
             RFC 6962 Merkle tree inclusion proof synced to PostgreSQL ACID WAL
           </p>
-          <div className="p-space-sm rounded bg-surface-container-low border border-surface-container-high font-mono-code text-[11px] space-y-1 mt-space-xs">
+          <div className="p-space-sm rounded bg-surface-container-low border border-surface-container-high font-mono-code text-[11px] space-y-1.5 mt-space-xs">
             <div className="flex justify-between">
               <span className="text-outline">Merkle Leaf Index:</span>
               <span className="text-on-surface">
@@ -256,7 +296,7 @@ export const PaymentInvestigation: React.FC = () => {
             </div>
             <div className="flex justify-between">
               <span className="text-outline">Leaf Hash (SHA256):</span>
-              <span className="text-secondary truncate ml-2">
+              <span className="text-secondary truncate ml-2 font-mono-code">
                 {auditData?.merkle_leaf_hash || "0x8a91f4c9...821b0"}
               </span>
             </div>
@@ -266,6 +306,21 @@ export const PaymentInvestigation: React.FC = () => {
                 {auditData?.policy_allowed !== false ? "VALID (IMMUTABLE)" : "HELD BY POLICY"}
               </span>
             </div>
+            {auditData?.merkle_proof && auditData.merkle_proof.length > 0 && (
+              <div className="border-t border-surface-container-high/60 pt-1.5 mt-1 space-y-1">
+                <span className="text-outline text-[10px] uppercase font-semibold">
+                  Merkle Inclusion Proof Nodes:
+                </span>
+                {auditData.merkle_proof.map((proofHash, i) => (
+                  <div key={i} className="flex justify-between text-[10px]">
+                    <span className="text-outline font-medium">Proof #{i + 1}:</span>
+                    <span className="text-primary truncate ml-2 font-mono-code">
+                      {proofHash}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
