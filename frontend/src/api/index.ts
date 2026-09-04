@@ -1,4 +1,4 @@
-﻿import { RecoveryAction } from '../types';
+import { RecoveryAction } from '../types';
 import { TransactionRowData } from '../components/recovery/TransactionTable';
 
 export interface RecoveryDecisionRequest {
@@ -410,15 +410,12 @@ export const recoveryApi = {
 
   async getCircuitBreakers(): Promise<CircuitBreakerStatus[]> {
     try {
-      const res = await fetch(`${EXECUTOR_API_URL}/v1/system/circuit-breakers`);
+      const res = await fetch(`${AI_API_URL}/v1/system/circuit-breakers`).catch(() =>
+        fetch(`${EXECUTOR_API_URL}/v1/system/circuit-breakers`)
+      );
       if (!res.ok) throw new Error(`Circuit breakers API error: ${res.status}`);
       return res.json();
     } catch {
-      const aiRes = await fetch(`${AI_API_URL}/v1/analytics/overview-summary`).catch(() => null);
-      if (aiRes && aiRes.ok) {
-        const data: OverviewSummaryResponse = await aiRes.json();
-        return data.circuit_breakers;
-      }
       return [
         { gateway: 'HDFC', state: 'CLOSED', failure_count: 0, failure_threshold: 5 },
         { gateway: 'ICICI', state: 'CLOSED', failure_count: 1, failure_threshold: 5 },
@@ -429,20 +426,26 @@ export const recoveryApi = {
   },
 
   async tripCircuitBreaker(gateway: string): Promise<void> {
-    await fetch(`${EXECUTOR_API_URL}/v1/system/circuit-breakers/trip?gateway=${gateway}`, {
-      method: 'POST',
-    });
+    try {
+      await fetch(`${AI_API_URL}/v1/system/circuit-breakers/trip?gateway=${gateway}`, { method: 'POST' });
+    } catch {
+      await fetch(`${EXECUTOR_API_URL}/v1/system/circuit-breakers/trip?gateway=${gateway}`, { method: 'POST' });
+    }
   },
 
   async resetCircuitBreaker(gateway: string): Promise<void> {
-    await fetch(`${EXECUTOR_API_URL}/v1/system/circuit-breakers/reset?gateway=${gateway}`, {
-      method: 'POST',
-    });
+    try {
+      await fetch(`${AI_API_URL}/v1/system/circuit-breakers/reset?gateway=${gateway}`, { method: 'POST' });
+    } catch {
+      await fetch(`${EXECUTOR_API_URL}/v1/system/circuit-breakers/reset?gateway=${gateway}`, { method: 'POST' });
+    }
   },
 
   async getSystemNodes(): Promise<NodeStatus> {
     try {
-      const res = await fetch(`${EXECUTOR_API_URL}/v1/system/nodes`);
+      const res = await fetch(`${AI_API_URL}/v1/system/nodes`).catch(() =>
+        fetch(`${EXECUTOR_API_URL}/v1/system/nodes`)
+      );
       if (!res.ok) throw new Error(`Nodes API error: ${res.status}`);
       return res.json();
     } catch {

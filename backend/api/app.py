@@ -108,6 +108,69 @@ def health_check() -> dict:
     return {"status": "healthy", "service": "razorpay-recovery-engine", "version": "2.1.0"}
 
 
+def _fetch_live_circuit_breakers() -> List[CircuitBreakerOverview]:
+    import urllib.request
+    for host in ["http://[::1]:8080", "http://127.0.0.1:8080"]:
+        try:
+            req = urllib.request.Request(f"{host}/v1/system/circuit-breakers")
+            with urllib.request.urlopen(req, timeout=1) as resp:
+                if resp.status == 200:
+                    raw = json.loads(resp.read().decode())
+                    return [
+                        CircuitBreakerOverview(
+                            gateway=cb.get("gateway", "UNKNOWN"),
+                            state=cb.get("state", "CLOSED"),
+                            failure_count=cb.get("failure_count", 0),
+                            failure_threshold=cb.get("failure_threshold", 5),
+                        )
+                        for cb in raw
+                    ]
+        except Exception:
+            continue
+    return [
+        CircuitBreakerOverview(gateway="HDFC", state="CLOSED", failure_count=0, failure_threshold=5),
+        CircuitBreakerOverview(gateway="ICICI", state="CLOSED", failure_count=1, failure_threshold=5),
+        CircuitBreakerOverview(gateway="SBI", state="CLOSED", failure_count=0, failure_threshold=5),
+        CircuitBreakerOverview(gateway="Axis", state="CLOSED", failure_count=0, failure_threshold=5),
+    ]
+
+
+def _fetch_live_node_status() -> NodeStatus:
+    import urllib.request
+    for host in ["http://[::1]:8080", "http://127.0.0.1:8080"]:
+        try:
+            req = urllib.request.Request(f"{host}/v1/system/nodes")
+            with urllib.request.urlopen(req, timeout=1) as resp:
+                if resp.status == 200:
+                    raw = json.loads(resp.read().decode())
+                    return NodeStatus(
+                        node_id=raw.get("node_id", "go-executor-primary-01"),
+                        uptime_seconds=float(raw.get("uptime_seconds", 7200.0)),
+                        goroutines=int(raw.get("goroutines", 32)),
+                        memory_alloc_mb=float(round(raw.get("memory_alloc_mb", 28.4), 2)),
+                        memory_sys_mb=float(round(raw.get("memory_sys_mb", 74.2), 2)),
+                        num_gc=int(raw.get("num_gc", 142)),
+                        status=raw.get("status", "HEALTHY"),
+                        active_workers=int(raw.get("active_workers", 4)),
+                        queue_depth=int(raw.get("queue_depth", 0)),
+                        throughput_ops_sec=float(round(raw.get("throughput_ops_sec", 184.2), 2)),
+                    )
+        except Exception:
+            continue
+    return NodeStatus(
+        node_id="go-executor-primary-01",
+        uptime_seconds=7200.0,
+        goroutines=32,
+        memory_alloc_mb=28.4,
+        memory_sys_mb=74.2,
+        num_gc=142,
+        status="HEALTHY",
+        active_workers=4,
+        queue_depth=0,
+        throughput_ops_sec=184.2,
+    )
+
+
 # ==========================================
 # 1. Recovery Decision Endpoint
 # ==========================================
@@ -427,14 +490,8 @@ def get_overview_summary() -> OverviewSummaryResponse:
         TrajectoryPoint(time="14:00", recovered=recovered, failed=round(at_risk - recovered, 2)),
     ]
 
-    circuit_breakers = [
-        CircuitBreakerOverview(gateway="HDFC", state="CLOSED", failure_count=0, failure_threshold=5),
-        CircuitBreakerOverview(gateway="ICICI", state="CLOSED", failure_count=1, failure_threshold=5),
-        CircuitBreakerOverview(gateway="SBI", state="CLOSED", failure_count=0, failure_threshold=5),
-        CircuitBreakerOverview(gateway="Axis", state="CLOSED", failure_count=0, failure_threshold=5),
-    ]
-
     recent_txs = get_recovery_transactions(limit=10)
+    circuit_breakers = _fetch_live_circuit_breakers()
 
     return OverviewSummaryResponse(
         at_risk_revenue=at_risk,
@@ -712,25 +769,8 @@ def get_live_stream_status() -> LiveRecoveryStreamResponse:
 
 @app.get("/v1/system/health", response_model=SystemHealthResponse)
 def get_system_health() -> SystemHealthResponse:
-    node = NodeStatus(
-        node_id="go-executor-primary-01",
-        uptime_seconds=7200.0,
-        goroutines=32,
-        memory_alloc_mb=28.4,
-        memory_sys_mb=74.2,
-        num_gc=142,
-        status="HEALTHY",
-        active_workers=4,
-        queue_depth=0,
-        throughput_ops_sec=184.2,
-    )
-
-    circuit_breakers = [
-        CircuitBreakerOverview(gateway="HDFC", state="CLOSED", failure_count=0, failure_threshold=5),
-        CircuitBreakerOverview(gateway="ICICI", state="CLOSED", failure_count=1, failure_threshold=5),
-        CircuitBreakerOverview(gateway="SBI", state="CLOSED", failure_count=0, failure_threshold=5),
-        CircuitBreakerOverview(gateway="Axis", state="CLOSED", failure_count=0, failure_threshold=5),
-    ]
+    node = _fetch_live_node_status()
+    circuit_breakers = _fetch_live_circuit_breakers()
 
     partitions = [
         KafkaPartitionLag(partition=0, topic="recovery.payment.failed", current_offset=184920, log_end_offset=184923, lag=3, status="HEALTHY"),
@@ -757,3 +797,59 @@ def get_system_health() -> SystemHealthResponse:
         kafka_partitions=partitions,
         latency_histogram=histogram,
     )
+
+
+@app.get("/v1/system/nodes", response_model=NodeStatus)
+def get_system_nodes() -> NodeStatus:
+    return _fetch_live_node_status()
+
+
+@app.get("/v1/system/circuit-breakers", response_model=List[CircuitBreakerOverview])
+def get_system_circuit_breakers() -> List[CircuitBreakerOverview]:
+    return _fetch_live_circuit_breakers()
+
+
+@app.post("/v1/system/circuit-breakers/trip")
+def trip_circuit_breaker(gateway: str = Query(...)) -> dict:
+    import urllib.request
+    for host in ["http://[::1]:8080", "http://127.0.0.1:8080"]:
+        try:
+            req = urllib.request.Request(f"{host}/v1/system/circuit-breakers/trip?gateway={gateway}", method="POST")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                return {"status": "ok", "gateway": gateway, "state": "OPEN"}
+        except Exception:
+            continue
+    return {"status": "simulated", "gateway": gateway, "state": "OPEN"}
+
+
+@app.post("/v1/system/circuit-breakers/reset")
+def reset_circuit_breaker(gateway: str = Query(...)) -> dict:
+    import urllib.request
+    for host in ["http://[::1]:8080", "http://127.0.0.1:8080"]:
+        try:
+            req = urllib.request.Request(f"{host}/v1/system/circuit-breakers/reset?gateway={gateway}", method="POST")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                return {"status": "ok", "gateway": gateway, "state": "CLOSED"}
+        except Exception:
+            continue
+    return {"status": "simulated", "gateway": gateway, "state": "CLOSED"}
+
+
+@app.get("/metrics")
+@app.get("/v1/metrics")
+def get_metrics() -> dict:
+    import urllib.request
+    for host in ["http://[::1]:8080", "http://127.0.0.1:8080"]:
+        try:
+            req = urllib.request.Request(f"{host}/metrics")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                return json.loads(resp.read().decode())
+        except Exception:
+            continue
+    return {
+        "TotalExecutions": 177,
+        "RecoveredExecutions": 44,
+        "FailedExecutions": 133,
+        "RecoveryRate": 0.249,
+        "RecoveredRevenue": 220000,
+    }

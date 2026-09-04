@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { recoveryApi, mapTransactionItemToRow, CircuitBreakerStatus } from "../api";
 import { StatCard } from "../components/ui/StatCard";
 import { ToastContainer, ToastMessage } from "../components/ui/Toast";
@@ -11,77 +11,19 @@ import {
   ThresholdsConfig,
 } from "../components/recovery/ConfigureThresholdsModal";
 
-const initialTransactions: TransactionRowData[] = [
-  {
-    paymentId: "pay_9281a182",
-    timestamp: "13:30:12.821",
-    method: "UPI",
-    bank: "HDFC",
-    amount: 5200.0,
-    failureCode: "BANK_TIMEOUT",
-    expectedValue: 416.0,
-    action: "RETRY_NOW",
-    status: "RECOVERED",
-  },
-  {
-    paymentId: "pay_9282c491",
-    timestamp: "13:29:55.109",
-    method: "CARD",
-    bank: "ICICI",
-    amount: 14850.0,
-    failureCode: "GATEWAY_504",
-    expectedValue: 890.0,
-    action: "RETRY_LATER",
-    status: "ROUTING",
-  },
-  {
-    paymentId: "pay_9283e710",
-    timestamp: "13:28:41.642",
-    method: "NET_BANKING",
-    bank: "SBI",
-    amount: 23000.0,
-    failureCode: "INTERNAL_ERROR",
-    expectedValue: 120.0,
-    action: "SEND_REMINDER",
-    status: "PENDING",
-  },
-  {
-    paymentId: "pay_9284f229",
-    timestamp: "13:27:18.490",
-    method: "UPI",
-    bank: "AXIS",
-    amount: 850.0,
-    failureCode: "INSUFFICIENT_FUNDS",
-    expectedValue: 0.0,
-    action: "NO_ACTION",
-    status: "FAILED",
-  },
-  {
-    paymentId: "pay_9285b611",
-    timestamp: "13:25:04.221",
-    method: "UPI",
-    bank: "HDFC",
-    amount: 1950.0,
-    failureCode: "NETWORK_CONGESTION",
-    expectedValue: 156.0,
-    action: "RETRY_NOW",
-    status: "RECOVERED",
-  },
-];
-
 export const Overview: React.FC = () => {
   const [selectedTx, setSelectedTx] = useState<string | null>(null);
-  const [transactions, setTransactions] = useState<TransactionRowData[]>(initialTransactions);
+  const [transactions, setTransactions] = useState<TransactionRowData[]>([]);
   const [isThresholdsOpen, setIsThresholdsOpen] = useState(false);
   const [engineMode, setEngineMode] = useState<"AUTONOMOUS" | "SHADOW" | "MANUAL">("AUTONOMOUS");
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // Telemetry metrics state
-  const [atRiskRevenue, setAtRiskRevenue] = useState(15.14);
-  const [recoveredRevenue, setRecoveredRevenue] = useState(8.26);
-  const [recoveryRate, setRecoveryRate] = useState(54.26);
-  const [aiLift, setAiLift] = useState(6.61);
-  const [activeInFlight, setActiveInFlight] = useState(127);
+  // Telemetry metrics state (live from PostgreSQL recovery_audit)
+  const [atRiskRevenue, setAtRiskRevenue] = useState(0);
+  const [recoveredRevenue, setRecoveredRevenue] = useState(0);
+  const [recoveryRate, setRecoveryRate] = useState(0);
+  const [aiLift, setAiLift] = useState(0);
+  const [activeInFlight, setActiveInFlight] = useState(0);
   const [circuitBreakers, setCircuitBreakers] = useState<CircuitBreakerStatus[]>([]);
 
   const fetchOverview = () => {
