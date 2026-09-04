@@ -1,6 +1,8 @@
 package events
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,6 +17,30 @@ func TestDecisionClientProcessesPaymentFailedEvent(t *testing.T) {
 
 		if r.URL.Path != "/v1/recovery/decide" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("failed to read request body: %v", err)
+		}
+
+		var received PaymentFailedEvent
+		if err := json.Unmarshal(body, &received); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+
+		if received.SuccessRate != 0.80 {
+			t.Fatalf(
+				"expected success_rate 0.80, got %v",
+				received.SuccessRate,
+			)
+		}
+
+		if received.RecoveryRate != 0.50 {
+			t.Fatalf(
+				"expected recovery_rate 0.50, got %v",
+				received.RecoveryRate,
+			)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -42,6 +68,8 @@ func TestDecisionClientProcessesPaymentFailedEvent(t *testing.T) {
 		Bank:          "HDFC",
 		FailureCode:   "BANK_TIMEOUT",
 		Timestamp:     time.Now().UTC(),
+		SuccessRate:   0.80,
+		RecoveryRate:  0.50,
 	}
 
 	result, err := client.Decide(event)

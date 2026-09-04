@@ -175,8 +175,31 @@ $$\text{No Duplicate Execution} + \text{Bounded Retries} + \text{Deterministic P
 ## 6. Execution Milestones
 
 * **V2.1**: Event-Driven Ingestion with Apache Kafka (event schema, producer, partition keying).
-* **V2.2**: Asynchronous AI Decision Worker & Recovery Queue.
-* **V2.3**: Concurrent Go Executor Worker Pool & Redis Deduplication.
-* **V2.4**: Bank-Aware Rate Limiting & Circuit Breakers.
-* **V2.5**: Load Testing & Throughput Benchmarking (10k TPS verification).
+* **V2.4**: Explicit Manual Commit Semantics (`FetchMessage` → `Process` → `CommitMessages`).
+* **V2.5**: Dual-Layer Distributed Idempotency (`event_id` + `command_id`).
+* **V2.6**: Event Ingestion Recovery Worker.
+* **V2.7**: Cross-Service Decision Client Context Propagation (Go → FastAPI ML/EV Decision Engine).
+
+---
+
+## 7. Cross-Service Contract Verified
+
+```text
+PaymentFailedEvent (Go)
+ ├── payment_id, customer_id, amount
+ ├── payment_method, bank, failure_code
+ ├── timestamp
+ ├── success_rate (0.80)
+ └── recovery_rate (0.50)
+          │
+          ▼ HTTP POST /v1/recovery/decide
+Python FastAPI Decision Engine
+ ├── Scikit-learn Random Forest Model
+ ├── Action Probability Estimation
+ ├── Expected Value Maximization: EV(A) = P(A)*Amount - Cost(A)
+ └── Policy Guardrails (MIN_RETRY_CONFIDENCE >= 0.50)
+          │
+          ▼ DecisionResult JSON
+Go DecisionClient & Recovery Worker
+```
 

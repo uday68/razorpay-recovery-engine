@@ -16,7 +16,9 @@ func TestPaymentFailedEventContract(t *testing.T) {
 		"payment_method": "UPI",
 		"bank": "HDFC",
 		"failure_code": "BANK_TIMEOUT",
-		"timestamp": "2026-09-03T16:30:00Z"
+		"timestamp": "2026-09-03T16:30:00Z",
+		"success_rate": 0.80,
+		"recovery_rate": 0.50
 	}`
 
 	var event PaymentFailedEvent
@@ -60,6 +62,13 @@ func TestPaymentFailedEventContract(t *testing.T) {
 
 	if event.Timestamp.IsZero() {
 		t.Fatal("timestamp should not be zero")
+	}
+	if event.SuccessRate != 0.80 {
+		t.Fatalf("expected success_rate 0.80, got %v", event.SuccessRate)
+	}
+
+	if event.RecoveryRate != 0.50 {
+		t.Fatalf("expected recovery_rate 0.50, got %v", event.RecoveryRate)
 	}
 }
 func TestPaymentFailedEventValidation(t *testing.T) {
@@ -148,4 +157,5 @@ func TestPaymentFailedEventValidation(t *testing.T) {
 	if err := ValidatePaymentFailedEvent(valid); err != nil {
 		t.Fatalf("valid event should pass validation: %v", err)
 	}
+
 }

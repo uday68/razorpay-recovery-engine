@@ -12,4 +12,6 @@ type PaymentFailedEvent struct {
 	Bank          string    `json:"bank"`
 	FailureCode   string    `json:"failure_code"`
 	Timestamp     time.Time `json:"timestamp"`
+	SuccessRate   float64   `json:"success_rate"`
+	RecoveryRate  float64   `json:"recovery_rate"`
 }
