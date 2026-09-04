@@ -1,8 +1,14 @@
-import React from "react";
+﻿import React, { useState, useEffect } from "react";
+import { recoveryApi, MABExperimentResponse } from "../api";
 import { StatCard } from "../components/ui/StatCard";
 import { BanditArmRewardChart } from "../components/charts/BanditArmRewardChart";
 
 export const Experiments: React.FC = () => {
+  const [mabData, setMabData] = useState<MABExperimentResponse | null>(null);
+
+  useEffect(() => {
+    recoveryApi.getMABExperiment().then(setMabData).catch(console.warn);
+  }, []);
   return (
     <div className="w-full flex flex-col gap-space-lg pb-space-3xl animate-fade-in">
       {/* Header */}

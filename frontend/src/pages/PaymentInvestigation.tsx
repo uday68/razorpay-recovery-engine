@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+﻿import React, { useState, useEffect } from "react";
+import { recoveryApi, AuditDetailResponse } from "../api";
 import { ActionBadge } from "../components/ui/ActionBadge";
 import { StatusPill } from "../components/ui/StatusPill";
 import { CodeBlock } from "../components/ui/CodeBlock";
@@ -6,6 +7,20 @@ import { ConfidenceBar } from "../components/ui/ConfidenceBar";
 
 export const PaymentInvestigation: React.FC = () => {
   const [activePaymentId, setActivePaymentId] = useState("pay_9281a182_live");
+  const [auditData, setAuditData] = useState<AuditDetailResponse | null>(null);
+
+  const fetchInvestigation = (id: string) => {
+    recoveryApi
+      .getAuditDetail(id)
+      .then((data) => {
+        if (data) setAuditData(data);
+      })
+      .catch(console.warn);
+  };
+
+  useEffect(() => {
+    fetchInvestigation(activePaymentId);
+  }, []);
 
   const mockPayload = JSON.stringify(
     {
@@ -49,7 +64,7 @@ export const PaymentInvestigation: React.FC = () => {
             placeholder="Search Payment ID..."
             className="px-space-sm py-1.5 rounded bg-surface-container border border-surface-container-high text-on-surface font-mono-code text-[12px] focus:outline-none focus:border-primary"
           />
-          <button className="h-8 px-space-md rounded bg-primary text-on-primary font-badge-label text-badge-label font-semibold hover:bg-primary-container transition-colors">
+          <button onClick={() => fetchInvestigation(activePaymentId)} className="h-8 px-space-md rounded bg-primary text-on-primary font-badge-label text-badge-label font-semibold hover:bg-primary-container transition-colors">
             Search
           </button>
         </div>

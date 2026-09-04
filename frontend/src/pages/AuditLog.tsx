@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+﻿import React, { useState, useEffect } from "react";
+import { recoveryApi, AuditLedgerResponse } from "../api";
 import { StatCard } from "../components/ui/StatCard";
 import { SearchFilterBar } from "../components/ui/SearchFilterBar";
 import { CodeBlock } from "../components/ui/CodeBlock";
@@ -8,6 +9,11 @@ import { DecisionLineageDrawer } from "../components/recovery/DecisionLineageDra
 export const AuditLog: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTx, setSelectedTx] = useState<string | null>(null);
+  const [ledger, setLedger] = useState<AuditLedgerResponse | null>(null);
+
+  useEffect(() => {
+    recoveryApi.getAuditLedger(25).then(setLedger).catch(console.warn);
+  }, []);
 
   const mockMerkleProof = JSON.stringify(
     {

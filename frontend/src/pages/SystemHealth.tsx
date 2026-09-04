@@ -1,4 +1,5 @@
-import React from "react";
+﻿import React, { useState, useEffect } from "react";
+import { recoveryApi, NodeStatus, CircuitBreakerStatus } from "../api";
 import { StatCard } from "../components/ui/StatCard";
 import { WorkerClusterStatus } from "../components/system/WorkerClusterStatus";
 import { LatencyHistogram } from "../components/charts/LatencyHistogram";
@@ -6,6 +7,17 @@ import { KafkaLagMonitor } from "../components/system/KafkaLagMonitor";
 import { CircuitBreakerCard } from "../components/system/CircuitBreakerCard";
 
 export const SystemHealth: React.FC = () => {
+  const [nodes, setNodes] = useState<NodeStatus | null>(null);
+  const [circuitBreakers, setCircuitBreakers] = useState<CircuitBreakerStatus[]>([]);
+
+  const fetchHealth = () => {
+    recoveryApi.getSystemNodes().then(setNodes).catch(console.warn);
+    recoveryApi.getCircuitBreakers().then(setCircuitBreakers).catch(console.warn);
+  };
+
+  useEffect(() => {
+    fetchHealth();
+  }, []);
   return (
     <div className="w-full flex flex-col gap-space-lg pb-space-3xl animate-fade-in">
       {/* Header */}
@@ -28,7 +40,7 @@ export const SystemHealth: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-space-xs">
-          <button className="h-8 px-space-md rounded bg-surface-container-low hover:bg-surface-container-high text-on-surface font-badge-label text-badge-label transition-colors">
+          <button onClick={fetchHealth} className="h-8 px-space-md rounded bg-surface-container-low hover:bg-surface-container-high text-on-surface font-badge-label text-badge-label transition-colors">
             Run Health Probe
           </button>
         </div>

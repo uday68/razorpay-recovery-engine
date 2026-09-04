@@ -1,9 +1,15 @@
-import React from "react";
+﻿import React, { useState, useEffect } from "react";
+import { recoveryApi, AIModelHealthResponse } from "../api";
 import { StatCard } from "../components/ui/StatCard";
 import { CalibrationCurve } from "../components/charts/CalibrationCurve";
 import { ConfidenceBar } from "../components/ui/ConfidenceBar";
 
 export const AIIntelligence: React.FC = () => {
+  const [modelHealth, setModelHealth] = useState<AIModelHealthResponse | null>(null);
+
+  useEffect(() => {
+    recoveryApi.getAIModelHealth().then(setModelHealth).catch(console.warn);
+  }, []);
   return (
     <div className="w-full flex flex-col gap-space-lg pb-space-3xl animate-fade-in">
       {/* Header */}

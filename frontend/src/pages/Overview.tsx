@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+ï»¿import React, { useState, useEffect } from "react";
+import { recoveryApi, mapTransactionItemToRow } from "../api";
 import { StatCard } from "../components/ui/StatCard";
 import { ToastContainer, ToastMessage } from "../components/ui/Toast";
 import { TrendAreaChart } from "../components/charts/TrendAreaChart";
@@ -79,6 +80,24 @@ export const Overview: React.FC = () => {
   const [atRiskRevenue, setAtRiskRevenue] = useState(15.14);
   const [recoveredRevenue, setRecoveredRevenue] = useState(8.26);
   const [activeInFlight, setActiveInFlight] = useState(127);
+
+  useEffect(() => {
+    recoveryApi
+      .getOverviewSummary()
+      .then((data) => {
+        if (data) {
+          setAtRiskRevenue(data.at_risk_revenue);
+          setRecoveredRevenue(data.recovered_revenue);
+          setActiveInFlight(data.active_in_flight);
+          if (data.recent_transactions && data.recent_transactions.length > 0) {
+            setTransactions(data.recent_transactions.map(mapTransactionItemToRow));
+          }
+        }
+      })
+      .catch((err) => {
+        console.warn("Using offline summary telemetry:", err);
+      });
+  }, []);
 
   // Policy Thresholds configuration
   const [thresholds, setThresholds] = useState<ThresholdsConfig>({
@@ -321,7 +340,7 @@ export const Overview: React.FC = () => {
         <StatCard
           title="Active In-Flight"
           value={`${activeInFlight} active`}
-          subtitle={`${Math.round(activeInFlight * 0.65)} queue · ${Math.round(
+          subtitle={`${Math.round(activeInFlight * 0.65)} queue ï¿½ ${Math.round(
             activeInFlight * 0.35
           )} exec`}
           delta="lag 8ms"

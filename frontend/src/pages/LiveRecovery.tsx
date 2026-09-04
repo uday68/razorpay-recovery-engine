@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+﻿import React, { useState, useEffect } from "react";
+import { recoveryApi } from "../api";
+import { TransactionRowData } from "../components/recovery/TransactionTable";
 import { StatCard } from "../components/ui/StatCard";
 import { SearchFilterBar } from "../components/ui/SearchFilterBar";
 import { TrendAreaChart } from "../components/charts/TrendAreaChart";
@@ -11,6 +13,22 @@ export const LiveRecovery: React.FC = () => {
   const [selectedGateway, setSelectedGateway] = useState("ALL");
   const [selectedStatus, setSelectedStatus] = useState("ALL");
   const [selectedTx, setSelectedTx] = useState<string | null>(null);
+  const [transactions, setTransactions] = useState<TransactionRowData[]>([]);
+
+  useEffect(() => {
+    recoveryApi
+      .getTransactions({
+        gateway: selectedGateway !== "ALL" ? selectedGateway : undefined,
+        status: selectedStatus !== "ALL" ? selectedStatus : undefined,
+        search: searchQuery || undefined,
+      })
+      .then((txs) => {
+        if (txs && txs.length > 0) setTransactions(txs);
+      })
+      .catch((err) => {
+        console.warn("Using offline transactions:", err);
+      });
+  }, [selectedGateway, selectedStatus, searchQuery]);
 
   return (
     <div className="w-full flex flex-col gap-space-lg pb-space-3xl animate-fade-in">
@@ -94,7 +112,7 @@ export const LiveRecovery: React.FC = () => {
       />
 
       {/* Real-time Ledger */}
-      <TransactionTable onInspect={(id) => setSelectedTx(id)} />
+      <TransactionTable transactions={transactions.length > 0 ? transactions : undefined} onInspect={(id) => setSelectedTx(id)} />
 
       {/* Decision Lineage Drawer */}
       <DecisionLineageDrawer
