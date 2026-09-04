@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { StatusPill } from "../ui/StatusPill";
 
 export interface GatewayBreaker {
@@ -56,6 +56,12 @@ export const CircuitBreakerCard: React.FC<CircuitBreakerCardProps> = ({
 }) => {
   const [gateways, setGateways] = useState<GatewayBreaker[]>(initialGateways);
 
+  useEffect(() => {
+    if (initialGateways && initialGateways.length > 0) {
+      setGateways(initialGateways);
+    }
+  }, [initialGateways]);
+
   const handleToggle = (index: number) => {
     setGateways((prev) =>
       prev.map((gw, i) => {
@@ -99,58 +105,74 @@ export const CircuitBreakerCard: React.FC<CircuitBreakerCardProps> = ({
               key={gw.name}
               className="flex flex-col p-space-sm rounded bg-surface-container-low border border-surface-container-high font-mono-code text-[11px] gap-1.5 justify-between transition-all"
             >
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-on-surface font-medium truncate max-w-[130px]">
+              <div className="flex items-start justify-between gap-1">
+                <div>
+                  <h4 className="font-headline-sm text-[13px] text-on-surface font-semibold truncate">
                     {gw.name}
+                  </h4>
+                  <span className="text-outline text-[10px] truncate block">
+                    {gw.type}
                   </span>
-                  <StatusPill
-                    status={
-                      isHealthy ? "OPTIMAL" : isWarning ? "PENDING" : "FAILED"
+                </div>
+                <StatusPill
+                  status={gw.state}
+                  label={gw.state}
+                  pulse={isWarning}
+                />
+              </div>
+
+              <div className="space-y-1 mt-1">
+                <div className="flex justify-between text-outline text-[10px]">
+                  <span>Rolling Failure Rate:</span>
+                  <span
+                    className={
+                      isHealthy
+                        ? "text-secondary font-medium"
+                        : isWarning
+                        ? "text-tertiary font-medium"
+                        : "text-error font-medium"
                     }
-                    label={gw.state}
+                  >
+                    {gw.failureRate.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      isHealthy
+                        ? "bg-secondary"
+                        : isWarning
+                        ? "bg-tertiary"
+                        : "bg-error"
+                    }`}
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        Math.max(5, (gw.failureRate / gw.threshold) * 100)
+                      )}%`,
+                    }}
                   />
                 </div>
-                <span className="font-body-sm text-[11px] text-outline block mt-0.5">
-                  {gw.type}
-                </span>
-
-                <div className="mt-2 space-y-1 pt-space-2xs border-t border-surface-container-high/40">
-                  <div className="flex justify-between">
-                    <span className="text-outline">Error Rate:</span>
-                    <span
-                      className={`font-semibold ${
-                        isHealthy
-                          ? "text-secondary"
-                          : isWarning
-                          ? "text-tertiary"
-                          : "text-error"
-                      }`}
-                    >
-                      {gw.failureRate}% / {gw.threshold}% max
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-outline">Last Tripped:</span>
-                    <span className="text-outline truncate max-w-[120px]">
-                      {gw.lastTrip}
-                    </span>
-                  </div>
+                <div className="flex justify-between text-outline text-[10px]">
+                  <span>Trip Threshold:</span>
+                  <span>{gw.threshold.toFixed(1)}%</span>
                 </div>
               </div>
 
-              {/* Operator Action Button */}
-              <button
-                type="button"
-                onClick={() => handleToggle(idx)}
-                className={`mt-space-xs w-full py-1 rounded text-badge-label font-badge-label transition-colors cursor-pointer ${
-                  isHealthy
-                    ? "bg-surface-container-high hover:bg-error/20 hover:text-error text-outline"
-                    : "bg-secondary/20 hover:bg-secondary/30 text-secondary font-semibold"
-                }`}
-              >
-                {isHealthy ? "Simulate Trip" : "Reset Breaker"}
-              </button>
+              <div className="flex items-center justify-between pt-1 border-t border-surface-container-high text-[10px] text-outline">
+                <span className="truncate">Last Trip: {gw.lastTrip}</span>
+                <button
+                  type="button"
+                  onClick={() => handleToggle(idx)}
+                  className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border transition-colors cursor-pointer ${
+                    gw.state === "CLOSED"
+                      ? "bg-error/10 text-error hover:bg-error/20 border-error/30"
+                      : "bg-secondary/10 text-secondary hover:bg-secondary/20 border-secondary/30"
+                  }`}
+                >
+                  {gw.state === "CLOSED" ? "Force Trip" : "Reset Breaker"}
+                </button>
+              </div>
             </div>
           );
         })}
@@ -160,4 +182,3 @@ export const CircuitBreakerCard: React.FC<CircuitBreakerCardProps> = ({
 };
 
 export default CircuitBreakerCard;
-
