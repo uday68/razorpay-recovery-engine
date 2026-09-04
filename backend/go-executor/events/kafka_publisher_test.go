@@ -10,7 +10,7 @@ import (
 
 func TestKafkaPublisherPublishesPaymentFailedEvent(t *testing.T) {
 	writer := &kafka.Writer{
-		Addr:                   kafka.TCP("localhost:9092"),
+		Addr:                   kafka.TCP("127.0.0.1:9092"),
 		Topic:                  "recovery.payment.failed",
 		Balancer:               &kafka.LeastBytes{},
 		AllowAutoTopicCreation: true,
@@ -38,7 +38,7 @@ func TestKafkaPublisherPublishesPaymentFailedEvent(t *testing.T) {
 	}
 
 	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: []string{"localhost:9092"},
+		Brokers: []string{"127.0.0.1:9092"},
 		Topic:   "recovery.payment.failed",
 		GroupID: "test-kafka-publisher",
 	})
