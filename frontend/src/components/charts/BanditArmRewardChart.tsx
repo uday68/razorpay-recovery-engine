@@ -3,7 +3,7 @@ import React from "react";
 export interface BanditArm {
   name: string;
   strategy: string;
-  winRate: number; // percentage
+  winRate: number;
   trials: number;
   ev: number;
   isLeader?: boolean;
@@ -15,26 +15,26 @@ export interface BanditArmRewardChartProps {
 
 const defaultArms: BanditArm[] = [
   {
-    name: "Arm A (AI Contextual Bandit v2.4)",
-    strategy: "Thompson Sampling + Policy Hard-Gate",
+    name: "AI Decision Engine (RF + EV Max + Safety Gate)",
+    strategy: "Random Forest Probability Estimation + EV Optimization + Policy Gate",
     winRate: 54.26,
-    trials: 12450,
-    ev: 412.5,
+    trials: 2978,
+    ev: 2772.30,
     isLeader: true,
   },
   {
-    name: "Arm B (Rule Baseline v1.1)",
-    strategy: "Static Deterministic Overrides",
-    winRate: 47.65,
-    trials: 6240,
-    ev: 328.0,
+    name: "Rule-Based Heuristic Baseline",
+    strategy: "Static Failure Code Dispatch Rules (No ML)",
+    winRate: 51.34,
+    trials: 2978,
+    ev: 2600.34,
   },
   {
-    name: "Arm C (Naive Auto-Retry)",
-    strategy: "Immediate Unconditioned Re-dispatch",
-    winRate: 31.12,
-    trials: 3120,
-    ev: 194.2,
+    name: "Naive Immediate Retry Baseline",
+    strategy: "Always RETRY_NOW on Failure (Legacy Default)",
+    winRate: 39.39,
+    trials: 2978,
+    ev: 2025.25,
   },
 ];
 
@@ -46,14 +46,14 @@ export const BanditArmRewardChart: React.FC<BanditArmRewardChartProps> = ({
       <div className="flex items-center justify-between mb-space-sm">
         <div>
           <h3 className="font-headline-sm text-headline-sm text-on-surface font-medium">
-            Multi-Armed Bandit Cohort Yield
+            3-Way Policy Strategy Yield Comparison
           </h3>
           <p className="font-body-sm text-body-sm text-outline">
-            Continuous Bayesian exploration vs exploitation across live traffic
+            Controlled deterministic evaluation across 10,000 synthetic payments (Seed 42)
           </p>
         </div>
         <span className="font-label-caps text-label-caps text-secondary uppercase px-space-xs py-0.5 rounded bg-secondary/10 border border-secondary/20">
-          Statistically Significant (p &lt; 0.001)
+          SIMULATED BENCHMARK
         </span>
       </div>
 
@@ -65,12 +65,12 @@ export const BanditArmRewardChart: React.FC<BanditArmRewardChartProps> = ({
                 {arm.name}{" "}
                 {arm.isLeader && (
                   <span className="text-secondary ml-1 font-label-caps text-[10px] uppercase">
-                    [Selected Leader]
+                    [Highest EV &amp; Recovery]
                   </span>
                 )}
               </span>
               <span className="text-secondary font-semibold">
-                {arm.winRate}% (?{arm.ev} EV)
+                {arm.winRate}% (₹{arm.ev.toFixed(2)} EV)
               </span>
             </div>
             <div className="h-3 w-full bg-surface-container-highest rounded-full overflow-hidden">
@@ -95,4 +95,3 @@ export const BanditArmRewardChart: React.FC<BanditArmRewardChartProps> = ({
 };
 
 export default BanditArmRewardChart;
-

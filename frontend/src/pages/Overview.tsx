@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { recoveryApi, mapTransactionItemToRow, CircuitBreakerStatus } from "../api";
+import { recoveryApi, mapTransactionItemToRow, CircuitBreakerStatus, TrajectoryPoint } from "../api";
 import { StatCard } from "../components/ui/StatCard";
 import { ToastContainer, ToastMessage } from "../components/ui/Toast";
 import { TrendAreaChart } from "../components/charts/TrendAreaChart";
@@ -25,6 +25,8 @@ export const Overview: React.FC = () => {
   const [aiLift, setAiLift] = useState(0);
   const [activeInFlight, setActiveInFlight] = useState(0);
   const [circuitBreakers, setCircuitBreakers] = useState<CircuitBreakerStatus[]>([]);
+  const [trajectoryData, setTrajectoryData] = useState<TrajectoryPoint[]>([]);
+
 
   const fetchOverview = () => {
     recoveryApi
@@ -37,6 +39,9 @@ export const Overview: React.FC = () => {
           setRecoveryRate(data.recovery_rate);
           setAiLift(data.ai_lift);
           if (data.circuit_breakers) setCircuitBreakers(data.circuit_breakers);
+          if (data.trajectory_series && data.trajectory_series.length > 0) {
+            setTrajectoryData(data.trajectory_series);
+          }
           if (data.recent_transactions && data.recent_transactions.length > 0) {
             setTransactions(data.recent_transactions.map(mapTransactionItemToRow));
           }
@@ -153,15 +158,15 @@ export const Overview: React.FC = () => {
     ];
 
     setTransactions((prev) => [...newSimulatedBatch, ...prev]);
-    setAtRiskRevenue((prev) => Number((prev + 0.03).toFixed(2)));
-    setRecoveredRevenue((prev) => Number((prev + 0.02).toFixed(2)));
+    setAtRiskRevenue((prev) => Number((prev + 0.30).toFixed(2)));
+    setRecoveredRevenue((prev) => Number((prev + 0.03).toFixed(2)));
     setActiveInFlight((prev) => prev + 3);
 
     addToast({
       id: Date.now().toString(),
       type: "info",
-      title: "Batch Failure Injected",
-      description: "Injected 3 synthetic failure events across HDFC, SBI, and ICICI.",
+      title: "[SIMULATION] Batch Failure Injected",
+      description: "Injected 3 simulated client-side test events across HDFC, SBI, and ICICI.",
     });
   };
 
@@ -218,40 +223,7 @@ export const Overview: React.FC = () => {
           threshold: cb.failure_threshold * 4.0,
           lastTrip: cb.last_trip_time || "None in 24h",
         }))
-      : [
-          {
-            name: "HDFC Bank UPI Switch",
-            type: "UPI 2.0 / IMPS",
-            state: "CLOSED",
-            failureRate: 1.8,
-            threshold: 15.0,
-            lastTrip: "None in 24h",
-          },
-          {
-            name: "ICICI Direct NetBanking",
-            type: "Corporate NetBanking",
-            state: "CLOSED",
-            failureRate: 3.4,
-            threshold: 20.0,
-            lastTrip: "None in 24h",
-          },
-          {
-            name: "SBI Payment Switch",
-            type: "Core Banking Gateway",
-            state: "HALF_OPEN",
-            failureRate: 14.2,
-            threshold: 20.0,
-            lastTrip: "42m ago",
-          },
-          {
-            name: "Axis Bank UPI Stack",
-            type: "UPI 2.0 Direct",
-            state: "CLOSED",
-            failureRate: 2.1,
-            threshold: 15.0,
-            lastTrip: "None in 24h",
-          },
-        ];
+      : [];
 
   return (
     <div className="w-full flex flex-col gap-space-lg pb-space-3xl animate-fade-in relative">
@@ -265,7 +237,7 @@ export const Overview: React.FC = () => {
             <div className="inline-flex items-center gap-space-xs px-space-sm py-space-2xs rounded-lg bg-surface-container-high text-tertiary">
               <span className="w-1.5 h-1.5 rounded-full bg-tertiary animate-ping" />
               <span className="font-label-caps text-label-caps tracking-wider uppercase">
-                PRODUCTION RUNTIME - HDFC / RAZORPAY / CASHFREE CLUSTER
+                RECOVERY CONTROL TOWER - LIVE LOCAL CLUSTER
               </span>
             </div>
           </div>
@@ -324,17 +296,17 @@ export const Overview: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-space-sm">
         <StatCard
           title="At-Risk Revenue"
-          value={`₹${atRiskRevenue.toFixed(2)}M`}
-          subtitle={`${(transactions.length * 856).toLocaleString()} failed txns today`}
-          delta="+2.4% vs yday"
-          deltaType="negative"
+          value={`₹${atRiskRevenue.toFixed(2)}L`}
+          subtitle={`${activeInFlight} recorded failures`}
+          delta="LIVE TELEMETRY"
+          deltaType="neutral"
           icon="trending_up"
         />
         <StatCard
           title="Recovered Revenue"
-          value={`₹${recoveredRevenue.toFixed(2)}M`}
+          value={`₹${recoveredRevenue.toFixed(2)}L`}
           subtitle={`${recoveryRate.toFixed(2)}% recovered volume`}
-          delta={`+₹${(recoveredRevenue * 0.14).toFixed(2)}M baseline`}
+          delta="LIVE TELEMETRY"
           deltaType="positive"
           icon="payments"
         />
@@ -349,18 +321,16 @@ export const Overview: React.FC = () => {
         <StatCard
           title="AI Revenue Lift"
           value={`+${aiLift.toFixed(2)}%`}
-          subtitle={`+₹${Math.round(recoveredRevenue * 1000 * 0.0661)}K incremental`}
-          delta="5 Seeds Validated"
+          subtitle="Seed 42 3-Way Benchmark"
+          delta="SIMULATED BENCHMARK"
           deltaType="positive"
           icon="auto_mode"
         />
         <StatCard
-          title="Active In-Flight"
-          value={`${activeInFlight} active`}
-          subtitle={`${Math.round(activeInFlight * 0.65)} queue • ${Math.round(
-            activeInFlight * 0.35
-          )} exec`}
-          delta="lag 8ms"
+          title="Audit Ledger Count"
+          value={`${activeInFlight} events`}
+          subtitle="PostgreSQL recovery_audit"
+          delta="ACID WAL LOGGED"
           deltaType="neutral"
           icon="bolt"
         />
@@ -372,6 +342,7 @@ export const Overview: React.FC = () => {
           <TrendAreaChart
             recoveredRate={`${recoveryRate.toFixed(2)}% Recovered`}
             unrecoveredRate={`${(100 - recoveryRate).toFixed(2)}% Terminal Drop`}
+            data={trajectoryData.length > 0 ? trajectoryData : undefined}
             onRangeChange={(range) =>
               addToast({
                 id: Date.now().toString(),
@@ -408,14 +379,14 @@ export const Overview: React.FC = () => {
 
               <h3 className="font-headline-sm text-headline-sm text-on-surface font-semibold mt-2">
                 {engineMode === "AUTONOMOUS"
-                  ? "Contextual Bandit + Safe Gate"
+                  ? "Random Forest + Safety Gate"
                   : engineMode === "SHADOW"
                   ? "Shadow Mode (Evaluation Only)"
                   : "Manual Operator Approval Gate"}
               </h3>
               <p className="font-body-sm text-body-sm text-outline mt-1">
                 {engineMode === "AUTONOMOUS"
-                  ? "Bandit model dynamically balances exploration and exploitation with strict deterministic policy boundaries."
+                  ? "Random Forest classifier dynamically evaluates recovery probability and expected value with deterministic policy safety boundaries."
                   : engineMode === "SHADOW"
                   ? "Inference runs in parallel with static baselines to benchmark performance without dispatching secondary charges."
                   : "Every recommended recovery action is placed into a staging review queue awaiting manual release."}
@@ -424,14 +395,14 @@ export const Overview: React.FC = () => {
 
             <div className="mt-4 p-space-sm rounded bg-surface-container-low border border-surface-container-high font-mono-code text-[11px] space-y-1">
               <div className="flex justify-between">
-                <span className="text-outline">Thompson Sampling:</span>
+                <span className="text-outline">Policy Safety Engine:</span>
                 <span className="text-secondary font-medium">
-                  {thresholds.autoRecoveryEnabled ? "ENABLED" : "PAUSED"}
+                  {thresholds.autoRecoveryEnabled ? "ACTIVE" : "PAUSED"}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-outline">Decision Latency:</span>
-                <span className="text-secondary font-medium">0.82ms (p50)</span>
+                <span className="text-secondary font-medium">~69ms (p50)</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-outline">EV Hard Floor:</span>

@@ -1,3 +1,101 @@
+
+export interface BanditArmState {
+  action: string;
+  alpha: number;
+  beta: number;
+  mean_reward: number;
+  variance: number;
+  credible_interval_95: [number, number];
+  successes: number;
+  failures: number;
+  total_pulls: number;
+  updated_at?: string;
+}
+
+export interface BanditStateResponse {
+  status: string;
+  algorithm: string;
+  priors: string;
+  total_decisions: number;
+  arms: BanditArmState[];
+}
+
+export interface SHAPFeatureAttribution {
+  feature: string;
+  raw_value: string | number;
+  shap_value: number;
+  direction: 'POSITIVE' | 'NEGATIVE';
+  importance_rank: number;
+}
+
+export interface SHAPExplanationResponse {
+  payment_id?: string;
+  model_name: string;
+  base_value: number;
+  output_probability: number;
+  prediction_label: string;
+  attributions: SHAPFeatureAttribution[];
+}
+
+export interface RFC6962MerkleRootResponse {
+  root_hash: string;
+  tree_size: number;
+  latest_leaf_id?: number;
+  algorithm: string;
+  leaf_prefix: string;
+  node_prefix: string;
+  timestamp: string;
+}
+
+export interface RFC6962ProofStep {
+  direction: 'left' | 'right';
+  hash: string;
+}
+
+export interface RFC6962MerkleProofResponse {
+  payment_id: string;
+  leaf_index: number;
+  tree_size: number;
+  leaf_hash: string;
+  audit_path: RFC6962ProofStep[];
+  root_hash: string;
+  verified: boolean;
+}
+
+export interface VerifyProofRequest {
+  leaf_hash: string;
+  leaf_index: number;
+  tree_size: number;
+  audit_path: RFC6962ProofStep[];
+  expected_root: string;
+}
+
+export interface VerifyProofResponse {
+  valid: boolean;
+  computed_root: string;
+  expected_root: string;
+  message: string;
+}
+
+export interface RateLimiterStatusResponse {
+  status: string;
+  source: string;
+  key: string;
+  limit: number;
+  window_seconds: number;
+  current_tokens: number;
+  remaining_tokens: number;
+  ttl_seconds: number;
+  allowed: boolean;
+}
+
+export interface KafkaDLQStatsResponse {
+  status: string;
+  topic: string;
+  total_dead_letters: number;
+  sample_dead_letters: Record<string, unknown>[];
+}
+
 import { RecoveryAction } from '../types';
 import { TransactionRowData } from '../components/recovery/TransactionTable';
 
@@ -65,17 +163,23 @@ export interface TrajectoryPoint {
 
 export interface CircuitBreakerStatus {
   gateway: string;
-  state: 'CLOSED' | 'HALF_OPEN' | 'OPEN';
+  state: 'CLOSED' | 'HALF_OPEN' | 'OPEN' | 'UNKNOWN';
   failure_count: number;
   failure_threshold: number;
   last_trip_time?: string;
+  status?: string;
+  source?: string;
 }
 
 export interface OverviewSummaryResponse {
+  status?: string;
+  source?: string;
   at_risk_revenue: number;
   recovered_revenue: number;
   recovery_rate: number;
   ai_lift: number;
+  ai_lift_status?: string;
+  ai_lift_source?: string;
   active_in_flight: number;
   trajectory_series: TrajectoryPoint[];
   circuit_breakers: CircuitBreakerStatus[];
@@ -113,6 +217,8 @@ export interface AuditDetailResponse {
   merkle_proof?: string[];
   state_steps?: StateStepItem[];
   raw_payload?: Record<string, unknown>;
+  status?: string;
+  source?: string;
 }
 
 export interface MABArm {
@@ -128,12 +234,14 @@ export interface MABArm {
 
 export interface MABExperimentResponse {
   experiment_id: string;
+  experiment_type?: string;
   status: string;
+  source?: string;
   total_trials: number;
   active_arms_count: number;
   exploration_allocation: number;
   ai_lift_vs_rule: number;
-  statistical_p_value: number;
+  statistical_p_value?: number | null;
   winning_arm: string;
   arms: MABArm[];
 }
@@ -156,6 +264,8 @@ export interface FeatureImportanceItem {
 }
 
 export interface AIModelHealthResponse {
+  status?: string;
+  source?: string;
   model_name: string;
   accuracy: number;
   precision: number;
@@ -166,7 +276,8 @@ export interface AIModelHealthResponse {
   cv_roc_auc_std: number;
   brier_score: number;
   ece: number;
-  concept_drift_psi: number;
+  concept_drift_psi?: number | null;
+  drift_status?: string;
   calibration_curve: CalibrationPoint[];
   latency: LatencyQuantiles;
   feature_importances: FeatureImportanceItem[];
@@ -193,6 +304,8 @@ export interface PolicySimulateRequest {
 }
 
 export interface PolicySimulateResponse {
+  status?: string;
+  source?: string;
   simulated_recovery_rate: number;
   simulated_recovered_revenue: number;
   simulated_blocked_count: number;
@@ -211,6 +324,9 @@ export interface AuditLedgerEntry {
 }
 
 export interface AuditLedgerResponse {
+  status?: string;
+  source?: string;
+  ledger_type?: string;
   total_records: number;
   merkle_root: string;
   tree_height: number;
@@ -220,6 +336,9 @@ export interface AuditLedgerResponse {
 }
 
 export interface MerkleProofResponse {
+  status?: string;
+  source?: string;
+  proof_type?: string;
   payment_id: string;
   leaf_hash: string;
   merkle_root: string;
@@ -230,17 +349,21 @@ export interface MerkleProofResponse {
 export interface KafkaPartitionLag {
   partition: number;
   topic: string;
-  current_offset: number;
-  log_end_offset: number;
-  lag: number;
+  current_offset?: number | null;
+  log_end_offset?: number | null;
+  lag?: number | null;
   status: string;
+  source?: string;
 }
 
 export interface LiveRecoveryStreamResponse {
-  streaming_rate: string;
-  instant_recovery_p95: string;
-  decision_p99_latency_ms: string;
-  kafka_lag_msgs: string;
+  status?: string;
+  source?: string;
+  message?: string;
+  streaming_rate?: string;
+  instant_recovery_p95?: string;
+  decision_p99_latency_ms?: string;
+  kafka_lag_msgs?: string;
   partitions: KafkaPartitionLag[];
   trend_data: TrajectoryPoint[];
 }
@@ -256,6 +379,7 @@ export interface NodeStatus {
   active_workers: number;
   queue_depth: number;
   throughput_ops_sec: number;
+  source?: string;
 }
 
 export interface LatencyBucket {
@@ -265,11 +389,12 @@ export interface LatencyBucket {
 }
 
 export interface SystemHealthResponse {
-  executor_throughput: string;
-  kafka_ingestion_lag: string;
-  p99_execution_time: string;
-  postgres_wal_sync: string;
-  node_status: NodeStatus;
+  status?: string;
+  executor_throughput?: string;
+  kafka_ingestion_lag?: string;
+  p99_execution_time?: string;
+  postgres_wal_sync?: string;
+  node_status?: NodeStatus | null;
   circuit_breakers: CircuitBreakerStatus[];
   kafka_partitions: KafkaPartitionLag[];
   latency_histogram: LatencyBucket[];
@@ -282,8 +407,8 @@ export function mapTransactionItemToRow(t: TransactionItem): TransactionRowData 
   return {
     paymentId: t.payment_id,
     timestamp: t.timestamp,
-    method: t.method || 'UPI',
-    bank: t.bank,
+    method: t.method || 'UNAVAILABLE',
+    bank: t.bank || 'UNAVAILABLE',
     amount: t.amount,
     failureCode: t.failure_code,
     expectedValue: t.expected_value,
@@ -293,7 +418,6 @@ export function mapTransactionItemToRow(t: TransactionItem): TransactionRowData 
 }
 
 export const recoveryApi = {
-  // Decision Engine API (FastAPI :8000)
   async getDecision(request: RecoveryDecisionRequest): Promise<RecoveryDecisionResponse> {
     const res = await fetch(`${AI_API_URL}/v1/recovery/decide`, {
       method: 'POST',
@@ -322,7 +446,7 @@ export const recoveryApi = {
       const items: TransactionItem[] = await res.json();
       return items.map(mapTransactionItemToRow);
     } catch (err) {
-      console.warn('Using local fallback for transactions:', err);
+      console.warn('Transactions API unavailable:', err);
       return [];
     }
   },
@@ -391,7 +515,6 @@ export const recoveryApi = {
     return res.json();
   },
 
-  // Executor Engine API (Go :8080)
   async executeRecovery(command: RecoveryCommand): Promise<ExecutionResult> {
     const res = await fetch(`${EXECUTOR_API_URL}/v1/recovery/execute`, {
       method: 'POST',
@@ -416,12 +539,7 @@ export const recoveryApi = {
       if (!res.ok) throw new Error(`Circuit breakers API error: ${res.status}`);
       return res.json();
     } catch {
-      return [
-        { gateway: 'HDFC', state: 'CLOSED', failure_count: 0, failure_threshold: 5 },
-        { gateway: 'ICICI', state: 'CLOSED', failure_count: 1, failure_threshold: 5 },
-        { gateway: 'SBI', state: 'CLOSED', failure_count: 0, failure_threshold: 5 },
-        { gateway: 'Axis', state: 'CLOSED', failure_count: 0, failure_threshold: 5 },
-      ];
+      return [];
     }
   },
 
@@ -451,18 +569,66 @@ export const recoveryApi = {
     } catch {
       return {
         node_id: 'go-executor-primary-01',
-        uptime_seconds: 7200,
-        goroutines: 32,
-        memory_alloc_mb: 28.4,
-        memory_sys_mb: 74.2,
-        num_gc: 142,
-        status: 'HEALTHY',
-        active_workers: 4,
+        uptime_seconds: 0,
+        goroutines: 0,
+        memory_alloc_mb: 0,
+        memory_sys_mb: 0,
+        num_gc: 0,
+        status: 'UNAVAILABLE',
+        active_workers: 0,
         queue_depth: 0,
-        throughput_ops_sec: 184.2,
+        throughput_ops_sec: 0,
+        source: 'unavailable',
       };
     }
   },
+
+  async getBanditState(): Promise<BanditStateResponse> {
+    const res = await fetch(`${AI_API_URL}/v1/ai/bandit`);
+    if (!res.ok) throw new Error(`Bandit state error: ${res.status}`);
+    return res.json();
+  },
+
+  async getSHAPExplanation(paymentId: string): Promise<SHAPExplanationResponse> {
+    const res = await fetch(`${AI_API_URL}/v1/ai/explain/${paymentId}`);
+    if (!res.ok) throw new Error(`SHAP explanation error: ${res.status}`);
+    return res.json();
+  },
+
+  async getRFC6962MerkleRoot(): Promise<RFC6962MerkleRootResponse> {
+    const res = await fetch(`${AI_API_URL}/v1/audit/merkle-root`);
+    if (!res.ok) throw new Error(`RFC 6962 root error: ${res.status}`);
+    return res.json();
+  },
+
+  async getRFC6962Proof(paymentId: string): Promise<RFC6962MerkleProofResponse> {
+    const res = await fetch(`${AI_API_URL}/v1/audit/rfc6962-proof/${paymentId}`);
+    if (!res.ok) throw new Error(`RFC 6962 proof error: ${res.status}`);
+    return res.json();
+  },
+
+  async verifyMerkleProof(req: VerifyProofRequest): Promise<VerifyProofResponse> {
+    const res = await fetch(`${AI_API_URL}/v1/audit/verify-proof`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+    });
+    if (!res.ok) throw new Error(`Proof verification error: ${res.status}`);
+    return res.json();
+  },
+
+  async getRateLimiterStatus(): Promise<RateLimiterStatusResponse> {
+    const res = await fetch(`${AI_API_URL}/v1/system/rate-limiter`);
+    if (!res.ok) throw new Error(`Rate limiter error: ${res.status}`);
+    return res.json();
+  },
+
+  async getDLQStats(): Promise<KafkaDLQStatsResponse> {
+    const res = await fetch(`${AI_API_URL}/v1/system/dlq`);
+    if (!res.ok) throw new Error(`DLQ stats error: ${res.status}`);
+    return res.json();
+  },
+
 };
 
 export default recoveryApi;

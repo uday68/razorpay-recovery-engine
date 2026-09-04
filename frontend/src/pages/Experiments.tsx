@@ -1,59 +1,64 @@
-﻿import React, { useState, useEffect } from "react";
-import { recoveryApi, MABExperimentResponse, MABArm } from "../api";
+import React, { useState, useEffect } from "react";
+import { recoveryApi, MABExperimentResponse, MABArm, BanditStateResponse } from "../api";
 import { StatCard } from "../components/ui/StatCard";
 import { BanditArmRewardChart } from "../components/charts/BanditArmRewardChart";
 
 export const Experiments: React.FC = () => {
   const [mabData, setMabData] = useState<MABExperimentResponse | null>(null);
+  const [banditData, setBanditData] = useState<BanditStateResponse | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchMab = () => {
+  const fetchData = () => {
     setRefreshing(true);
-    recoveryApi
-      .getMABExperiment()
-      .then((data) => {
-        if (data) setMabData(data);
-      })
-      .catch((err) => {
-        console.warn("Using offline MAB telemetry:", err);
+    Promise.allSettled([
+      recoveryApi.getMABExperiment(),
+      recoveryApi.getBanditState(),
+    ])
+      .then(([mabRes, banditRes]) => {
+        if (mabRes.status === "fulfilled" && mabRes.value) {
+          setMabData(mabRes.value);
+        }
+        if (banditRes.status === "fulfilled" && banditRes.value) {
+          setBanditData(banditRes.value);
+        }
       })
       .finally(() => setRefreshing(false));
   };
 
   useEffect(() => {
-    fetchMab();
+    fetchData();
   }, []);
 
   const defaultArms: MABArm[] = [
     {
-      arm_id: "arm_a_bandit",
-      name: "Arm A (Candidate Leader)",
-      strategy: "Contextual Bandit v2.4 + Thompson Sampling",
-      traffic_pct: 0.7,
-      trials: 1420,
-      wins: 771,
-      win_rate: 0.5426,
-      mean_ev: 412.5,
+      arm_id: "arm-ai-engine",
+      name: "AI Decision Engine (RF + EV Max + Policy)",
+      strategy: "Random Forest Classifier + Expected Value Optimization + Safety Gates",
+      traffic_pct: 33.3,
+      trials: 2978,
+      wins: 1616,
+      win_rate: 54.26,
+      mean_ev: 2772.30,
     },
     {
-      arm_id: "arm_b_rule",
-      name: "Arm B (Control Baseline)",
-      strategy: "Rule-Based Static Baseline v1.1",
-      traffic_pct: 0.2,
-      trials: 400,
-      wins: 191,
-      win_rate: 0.4765,
-      mean_ev: 328.0,
+      arm_id: "arm-baseline-rule",
+      name: "Rule-Based Heuristic Baseline",
+      strategy: "Static Failure Code Dispatch Rules (No ML)",
+      traffic_pct: 33.3,
+      trials: 2978,
+      wins: 1529,
+      win_rate: 51.34,
+      mean_ev: 2600.34,
     },
     {
-      arm_id: "arm_c_naive",
-      name: "Arm C (Naive Explorer)",
-      strategy: "Instant Retries (Zero Context)",
-      traffic_pct: 0.1,
-      trials: 200,
-      wins: 58,
-      win_rate: 0.29,
-      mean_ev: 194.2,
+      arm_id: "arm-baseline-naive",
+      name: "Naive Immediate Retry Baseline",
+      strategy: "Always RETRY_NOW on Failure (Legacy Default)",
+      traffic_pct: 33.4,
+      trials: 2978,
+      wins: 1173,
+      win_rate: 39.39,
+      mean_ev: 2025.25,
     },
   ];
 
@@ -66,27 +71,27 @@ export const Experiments: React.FC = () => {
         <div>
           <div className="flex items-center gap-space-sm flex-wrap">
             <h1 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
-              Recovery Experiments &amp; Bandits
+              Thompson Sampling & Policy Strategy Experiments
             </h1>
             <div className="inline-flex items-center gap-space-xs px-space-sm py-space-2xs rounded-lg bg-surface-container-high text-primary">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
               <span className="font-label-caps text-label-caps uppercase">
-                BAYESIAN THOMPSON SAMPLING ({mabData?.status || "ACTIVE"})
+                LIVE POSTGRESQL POSTERIORS & SIMULATED BENCHMARK
               </span>
             </div>
           </div>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            Multi-Armed Bandit (MAB) reinforcement experiments testing routing policies against real production volume
+            Live Beta-Bernoulli conjugate priors persisted in PostgreSQL and offline 3-way evaluation benchmark
           </p>
         </div>
 
         <div className="flex items-center gap-space-xs">
           <button
-            onClick={fetchMab}
+            onClick={fetchData}
             disabled={refreshing}
             className="h-8 px-space-md rounded bg-primary text-on-primary font-badge-label text-badge-label font-semibold hover:bg-primary-container transition-colors shadow-sm cursor-pointer disabled:opacity-50"
           >
-            {refreshing ? "Refreshing..." : "Re-evaluate Posterior"}
+            {refreshing ? "Refreshing..." : "Refresh Experiments"}
           </button>
         </div>
       </div>
@@ -94,116 +99,160 @@ export const Experiments: React.FC = () => {
       {/* Experiment Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-sm">
         <StatCard
-          title="Active Bandit Arms"
-          value={`${mabData?.active_arms_count ?? 3} Cohorts`}
-          subtitle="Bayesian exploration"
-          delta="Dynamic Alloc"
+          title="Bandit Algorithm"
+          value="Beta-Bernoulli"
+          subtitle="Thompson Sampling"
+          delta={banditData?.status || "LIVE"}
           deltaType="positive"
           icon="science"
         />
         <StatCard
-          title="Optimal Arm Yield"
-          value={`${(arms[0]?.win_rate * 100).toFixed(2)}%`}
-          subtitle={arms[0]?.name || "AI Contextual Bandit"}
-          delta={`+${(mabData?.ai_lift_vs_rule ?? 6.61).toFixed(2)}% vs Static`}
+          title="AI Recovery Yield"
+          value={`${arms[0]?.win_rate.toFixed(2)}%`}
+          subtitle="AI Decision Engine (RF)"
+          delta={`+${(mabData?.ai_lift_vs_rule ?? 6.61).toFixed(2)}% vs Rule`}
           deltaType="positive"
           icon="military_tech"
         />
         <StatCard
-          title="Exploration Ratio"
-          value={`${((mabData?.exploration_allocation ?? 0.1) * 100).toFixed(1)}%`}
-          subtitle="Epsilon greedy ceiling"
-          delta="Safety Protected"
-          deltaType="neutral"
-          icon="explore"
+          title="Rule-Based Yield"
+          value={`${arms[1]?.win_rate.toFixed(2)}%`}
+          subtitle="Static Heuristic Baseline"
+          delta="+11.95% vs Naive"
+          deltaType="positive"
+          icon="rule"
         />
         <StatCard
-          title="Statistical Significance"
-          value={`p < ${mabData?.statistical_p_value ?? 0.001}`}
-          subtitle="Confidence: 99.9%"
-          delta="Chi-Square Verified"
-          deltaType="positive"
+          title="Evaluated Failures"
+          value="2,978 txns"
+          subtitle="Out of 10,000 payments"
+          delta="Seed 42 Benchmark"
+          deltaType="neutral"
           icon="verified"
         />
       </div>
 
-      {/* Main Multi-Armed Bandit Chart */}
-      <BanditArmRewardChart />
+      {/* Live Beta-Bernoulli Thompson Sampling Table */}
+      {banditData && banditData.arms && (
+        <div className="flex flex-col p-space-base rounded-lg bg-surface-container border border-surface-container-high/60 gap-space-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="font-headline-sm text-headline-sm text-on-surface font-medium">
+              Live Action Exploration Posteriors (PostgreSQL: bandit_posterior)
+            </h3>
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono-code bg-secondary/10 text-secondary border border-secondary/30 font-semibold">
+              BAYESIAN CONJUGATE PRIORS
+            </span>
+          </div>
+          <p className="font-body-sm text-body-sm text-outline">
+            Sampled probability drawn from Beta(alpha, beta) distribution weighted by Expected Value, bounded by Policy Gate.
+          </p>
+
+          <div className="overflow-x-auto mt-space-xs">
+            <table className="w-full text-left border-collapse font-mono-code text-[12px]">
+              <thead>
+                <tr className="border-b border-surface-container-high bg-surface-container-lowest/50 font-label-caps text-label-caps text-outline uppercase">
+                  <th className="py-space-sm px-space-base">Recovery Action</th>
+                  <th className="py-space-sm px-space-base">Alpha (α: Success)</th>
+                  <th className="py-space-sm px-space-base">Beta (β: Failure)</th>
+                  <th className="py-space-sm px-space-base">Posterior Mean</th>
+                  <th className="py-space-sm px-space-base">95% Credible Interval</th>
+                  <th className="py-space-sm px-space-base">Pulls (Wins / Fails)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-container-high">
+                {banditData.arms.map((bArm) => (
+                  <tr key={bArm.action} className="hover:bg-surface-container-low/60 transition-colors">
+                    <td className="py-space-sm px-space-base font-semibold text-on-surface">
+                      {bArm.action}
+                    </td>
+                    <td className="py-space-sm px-space-base text-secondary">{bArm.alpha.toFixed(2)}</td>
+                    <td className="py-space-sm px-space-base text-error">{bArm.beta.toFixed(2)}</td>
+                    <td className="py-space-sm px-space-base text-primary font-semibold">
+                      {(bArm.mean_reward * 100).toFixed(2)}%
+                    </td>
+                    <td className="py-space-sm px-space-base text-outline">
+                      [{(bArm.credible_interval_95[0] * 100).toFixed(1)}%, {(bArm.credible_interval_95[1] * 100).toFixed(1)}%]
+                    </td>
+                    <td className="py-space-sm px-space-base text-on-surface">
+                      {bArm.total_pulls} pulls ({bArm.successes}W / {bArm.failures}L)
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Main Strategy Comparison Chart — data from mabData.arms (SIMULATED BENCHMARK) */}
+      <BanditArmRewardChart
+        arms={arms.map((arm) => ({
+          name: arm.name,
+          strategy: arm.strategy,
+          winRate: arm.win_rate,
+          trials: arm.trials,
+          ev: arm.mean_ev,
+          isLeader: arm.arm_id === (mabData?.winning_arm || "arm-ai-engine"),
+        }))}
+      />
 
       {/* Cohort Strategy Matrix */}
       <div className="flex flex-col p-space-base rounded-lg bg-surface-container border border-surface-container-high/60 gap-space-sm">
         <h3 className="font-headline-sm text-headline-sm text-on-surface font-medium">
-          Strategy Cohort Configuration Matrix
+          Controlled Evaluation Strategy Matrix (Benchmark)
         </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse font-mono-code text-[12px]">
             <thead>
               <tr className="border-b border-surface-container-high bg-surface-container-lowest/50 font-label-caps text-label-caps text-outline uppercase">
-                <th className="py-space-sm px-space-base">Cohort Arm</th>
+                <th className="py-space-sm px-space-base">Strategy Arm</th>
                 <th className="py-space-sm px-space-base">Decision Model</th>
-                <th className="py-space-sm px-space-base">Traffic Allocation</th>
+                <th className="py-space-sm px-space-base">Evaluated Trials</th>
                 <th className="py-space-sm px-space-base">Mean Recovery EV</th>
-                <th className="py-space-sm px-space-base">Status</th>
+                <th className="py-space-sm px-space-base">Recovery Yield</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-surface-container-high">
-              {arms.map((arm, index) => {
-                const isWinner = index === 0;
-                const isControl = index === 1;
+              {arms.map((arm) => {
+                const isLeader = arm.arm_id === (mabData?.winning_arm || "arm-ai-engine");
                 return (
-                  <tr key={arm.arm_id} className="hover:bg-surface-container-high/30">
-                    <td
-                      className={`py-space-sm px-space-base font-semibold ${
-                        isWinner
-                          ? "text-primary"
-                          : isControl
-                          ? "text-tertiary"
-                          : "text-outline"
-                      }`}
-                    >
-                      {arm.name}
+                  <tr
+                    key={arm.arm_id}
+                    className={`hover:bg-surface-container-low/60 transition-colors ${
+                      isLeader ? "bg-secondary/5 font-semibold" : ""
+                    }`}
+                  >
+                    <td className="py-space-sm px-space-base flex items-center gap-space-xs">
+                      <span className={isLeader ? "text-secondary" : "text-on-surface"}>
+                        {arm.name}
+                      </span>
+                      {isLeader && (
+                        <span className="px-space-2xs py-0.5 rounded text-[10px] uppercase font-bold bg-secondary/20 text-secondary">
+                          WINNER
+                        </span>
+                      )}
                     </td>
+                    <td className="py-space-sm px-space-base text-outline">{arm.strategy}</td>
                     <td className="py-space-sm px-space-base text-on-surface">
-                      {arm.strategy}
+                      {arm.trials.toLocaleString()}
                     </td>
-                    <td
-                      className={`py-space-sm px-space-base font-semibold ${
-                        isWinner
-                          ? "text-secondary"
-                          : isControl
-                          ? "text-on-surface"
-                          : "text-outline"
-                      }`}
-                    >
-                      {(arm.traffic_pct * 100).toFixed(1)}% {isWinner ? "(Adaptive)" : ""}
-                    </td>
-                    <td
-                      className={`py-space-sm px-space-base font-semibold ${
-                        isWinner
-                          ? "text-secondary"
-                          : isControl
-                          ? "text-on-surface"
-                          : "text-error"
-                      }`}
-                    >
-                      +₹{arm.mean_ev.toFixed(2)}
+                    <td className="py-space-sm px-space-base text-secondary">
+                      ₹{arm.mean_ev.toFixed(2)}
                     </td>
                     <td className="py-space-sm px-space-base">
-                      <span
-                        className={`px-space-xs py-0.5 rounded text-[10px] ${
-                          isWinner
-                            ? "bg-secondary/10 text-secondary border border-secondary/20"
-                            : isControl
-                            ? "bg-tertiary/10 text-tertiary border border-tertiary/20"
-                            : "bg-error/10 text-error border border-error/20"
-                        }`}
-                      >
-                        {isWinner
-                          ? "EXPLOITING (WINNER)"
-                          : isControl
-                          ? "BENCHMARK"
-                          : "EXPLORATION"}
-                      </span>
+                      <div className="flex items-center gap-space-xs">
+                        <div className="w-16 h-1.5 bg-surface-container-highest rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${
+                              isLeader ? "bg-secondary" : "bg-outline/50"
+                            }`}
+                            style={{ width: `${arm.win_rate}%` }}
+                          />
+                        </div>
+                        <span className={isLeader ? "text-secondary font-bold" : "text-on-surface"}>
+                          {arm.win_rate.toFixed(1)}%
+                        </span>
+                      </div>
                     </td>
                   </tr>
                 );

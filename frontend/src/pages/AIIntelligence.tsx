@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { recoveryApi, AIModelHealthResponse, FeatureImportanceItem } from "../api";
 import { StatCard } from "../components/ui/StatCard";
 import { CalibrationCurve } from "../components/charts/CalibrationCurve";
@@ -26,11 +26,14 @@ export const AIIntelligence: React.FC = () => {
   }, []);
 
   const defaultFeatures: FeatureImportanceItem[] = [
-    { feature: "Historical Bank Success Rate", importance: 0.384 },
-    { feature: "Payment Method (UPI vs Card)", importance: 0.242 },
-    { feature: "Failure Reason Category (Transient)", importance: 0.198 },
-    { feature: "Peak Hourly Congestion Index", importance: 0.116 },
-    { feature: "Customer Recency Factor", importance: 0.06 },
+    { feature: "action_NO_ACTION", importance: 0.2251 },
+    { feature: "recovery_rate", importance: 0.1170 },
+    { feature: "amount", importance: 0.1142 },
+    { feature: "success_rate", importance: 0.1136 },
+    { feature: "hour", importance: 0.0910 },
+    { feature: "action_SEND_REMINDER", importance: 0.0648 },
+    { feature: "action_RETRY_LATER", importance: 0.0589 },
+    { feature: "action_RETRY_NOW", importance: 0.0302 },
   ];
 
   const features =
@@ -45,17 +48,17 @@ export const AIIntelligence: React.FC = () => {
         <div>
           <div className="flex items-center gap-space-sm flex-wrap">
             <h1 className="font-headline-lg text-headline-lg text-on-surface tracking-tight">
-              AI Decision Intelligence &amp; Drift
+              AI Decision Intelligence &amp; Model Calibration
             </h1>
             <div className="inline-flex items-center gap-space-xs px-space-sm py-space-2xs rounded-lg bg-surface-container-high text-secondary">
               <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-ping" />
               <span className="font-label-caps text-label-caps uppercase">
-                MODEL INFERENCE HEALTHY (PSI &lt; 0.05)
+                MODEL INFERENCE ACTIVE (EVALUATION BENCHMARK: ml/data.csv)
               </span>
             </div>
           </div>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            Continuous Bayesian contextual bandit monitoring, model calibration, and real-time concept drift tracking
+            Supervised Random Forest recovery probability model with probability calibration and Gini impurity feature attribution
           </p>
         </div>
 
@@ -65,7 +68,7 @@ export const AIIntelligence: React.FC = () => {
             disabled={evaluating}
             className="h-8 px-space-md rounded bg-primary text-on-primary font-badge-label text-badge-label font-semibold hover:bg-primary-container transition-colors shadow-sm cursor-pointer disabled:opacity-50"
           >
-            {evaluating ? "Evaluating..." : "Evaluate Active Model"}
+            {evaluating ? "Evaluating..." : "Refresh Model Stats"}
           </button>
         </div>
       </div>
@@ -74,52 +77,53 @@ export const AIIntelligence: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-sm">
         <StatCard
           title="Brier Calibration Score"
-          value={modelHealth ? modelHealth.brier_score.toFixed(3) : "0.084"}
-          subtitle={`Target: < 0.100 (ECE: ${(modelHealth?.ece ?? 0.012).toFixed(3)})`}
+          value={modelHealth ? modelHealth.brier_score.toFixed(3) : "0.131"}
+          subtitle={`ECE: ${(modelHealth?.ece ?? 0.021).toFixed(3)}`}
           delta="Well Calibrated"
           deltaType="positive"
           icon="tune"
         />
         <StatCard
           title="Inference Latency (P95)"
-          value={modelHealth ? `${modelHealth.latency.p95_ms.toFixed(2)}ms` : "1.84ms"}
+          value={modelHealth ? `${modelHealth.latency.p95_ms.toFixed(2)}ms` : "96.50ms"}
           subtitle="FastAPI / ML Pipeline"
-          delta="< 5ms SLA"
-          deltaType="positive"
+          delta="p50: 69.1ms"
+          deltaType="neutral"
           icon="bolt"
         />
         <StatCard
-          title="Population Stability Index"
-          value={modelHealth ? modelHealth.concept_drift_psi.toFixed(3) : "0.038"}
-          subtitle="Drift threshold: 0.10"
-          delta="No Concept Drift"
-          deltaType="positive"
+          title="Streaming Concept Drift"
+          value="UNMONITORED"
+          subtitle="Requires live feature store"
+          delta="Local Dev Scope"
+          deltaType="neutral"
           icon="waves"
         />
         <StatCard
           title="Model Architecture"
           value={modelHealth ? modelHealth.model_name : "RandomForestClassifier"}
-          subtitle={`ROC-AUC: ${((modelHealth?.roc_auc ?? 0.878) * 100).toFixed(1)}%`}
-          delta="Active Champion"
+          subtitle={`ROC-AUC: ${((modelHealth?.roc_auc ?? 0.8784) * 100).toFixed(1)}%`}
+          delta="100 Estimators"
           deltaType="neutral"
           icon="verified"
         />
       </div>
 
-      {/* Model Calibration Curve */}
+      {/* Model Calibration Curve — points[] from GET /v1/ai/model-health */}
       <CalibrationCurve
         brierScore={modelHealth?.brier_score}
         expectedCalibrationError={modelHealth?.ece}
+        points={modelHealth?.calibration_curve}
       />
 
       {/* Feature Importance & Drift Matrix */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-space-lg">
         <div className="flex flex-col p-space-base rounded-lg bg-surface-container border border-surface-container-high/60 gap-space-sm">
           <h3 className="font-headline-sm text-headline-sm text-on-surface font-medium">
-            Live Global Feature Attribution (SHAP Signals)
+            Random Forest Gini Feature Importance (MDI)
           </h3>
           <p className="font-body-sm text-body-sm text-outline">
-            Relative weight of context variables driving recovery recommendations
+            Mean Decrease in Impurity computed across trees in ml/model.pkl
           </p>
 
           <div className="space-y-space-sm mt-space-xs font-mono-code text-[12px]">
@@ -139,40 +143,40 @@ export const AIIntelligence: React.FC = () => {
 
         <div className="flex flex-col p-space-base rounded-lg bg-surface-container border border-surface-container-high/60 gap-space-sm">
           <h3 className="font-headline-sm text-headline-sm text-on-surface font-medium">
-            Feature Distribution Drift (KS Test)
+            Data Provenance &amp; Telemetry Integrity
           </h3>
           <p className="font-body-sm text-body-sm text-outline">
-            Kolmogorov-Smirnov distance comparing training baseline vs live 24h window
+            Audit of model training provenance and streaming monitoring boundaries
           </p>
 
           <div className="p-space-sm rounded bg-surface-container-low border border-surface-container-high font-mono-code text-[11px] space-y-2 mt-space-xs">
             <div className="flex justify-between items-center">
               <div>
-                <span className="text-on-surface font-medium">Historical Bank Success Rate</span>
-                <div className="text-outline text-[10px]">p-value = 0.42 (Stable)</div>
+                <span className="text-on-surface font-medium">Training Dataset</span>
+                <div className="text-outline text-[10px]">ml/data.csv (59,380 synthetic payment trials)</div>
               </div>
-              <span className="text-secondary font-semibold">STABLE</span>
+              <span className="text-secondary font-semibold">VERIFIED</span>
             </div>
             <div className="flex justify-between items-center border-t border-surface-container-high/40 pt-1.5">
               <div>
-                <span className="text-on-surface font-medium">UPI vs NetBanking Route Latency</span>
-                <div className="text-outline text-[10px]">p-value = 0.38 (Normal)</div>
+                <span className="text-on-surface font-medium">Validation Metric (5-Fold CV)</span>
+                <div className="text-outline text-[10px]">ROC-AUC: 0.7523 ± 0.0054 (Test: 0.8784)</div>
               </div>
-              <span className="text-secondary font-semibold">STABLE</span>
+              <span className="text-secondary font-semibold">VALIDATED</span>
             </div>
             <div className="flex justify-between items-center border-t border-surface-container-high/40 pt-1.5">
               <div>
-                <span className="text-on-surface font-medium">Transient Failure Propensity</span>
-                <div className="text-outline text-[10px]">p-value = 0.51 (Calibrated)</div>
+                <span className="text-on-surface font-medium">Concept Drift Monitoring (PSI / KS)</span>
+                <div className="text-outline text-[10px]">Continuous stream monitoring inactive in local dev</div>
               </div>
-              <span className="text-secondary font-semibold">STABLE</span>
+              <span className="text-outline font-semibold">NOT ACTIVE</span>
             </div>
             <div className="flex justify-between items-center border-t border-surface-container-high/40 pt-1.5">
               <div>
-                <span className="text-on-surface font-medium">Ticket Size Distribution (Amount)</span>
-                <div className="text-outline text-[10px]">p-value = 0.47 (Consistent)</div>
+                <span className="text-on-surface font-medium">Model Artifact</span>
+                <div className="text-outline text-[10px]">ml/model.pkl (Scikit-Learn Pipeline)</div>
               </div>
-              <span className="text-secondary font-semibold">STABLE</span>
+              <span className="text-secondary font-semibold">LOADED</span>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { recoveryApi, LiveRecoveryStreamResponse } from "../api";
 import { TransactionRowData } from "../components/recovery/TransactionTable";
 import { StatCard } from "../components/ui/StatCard";
@@ -175,9 +175,10 @@ export const LiveRecovery: React.FC = () => {
         />
       </div>
 
-      {/* Trajectory Chart */}
+      {/* Trajectory Chart — data from /v1/recovery/stream-status trend_data */}
       <TrendAreaChart
         recoveredRate={streamStatus?.instant_recovery_p95 ? `${streamStatus.instant_recovery_p95} Recovered` : undefined}
+        data={streamStatus?.trend_data && streamStatus.trend_data.length > 0 ? streamStatus.trend_data : undefined}
       />
 
       {/* Kafka Partition Lag Monitor */}

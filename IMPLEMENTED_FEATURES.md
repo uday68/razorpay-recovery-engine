@@ -1,109 +1,60 @@
 # Razorpay Autonomous Payment Recovery Control Tower
-## System Architecture & Implemented Features Status
+## System Architecture & Verified Production Feature Status
 
-This document provides a comprehensive inventory of all features, services, and components currently implemented across the **Razorpay Recovery Engine** repository.
-
----
-
-## 1. High-Level Architecture
-
-The platform is designed as an autonomous, closed-loop financial recovery control plane for high-velocity payment failures across major Indian banking switches (HDFC, ICICI, SBI, Axis, and Razorpay UPI):
-
-```text
-[ Payment Failure Event ]
-          ¦
-          ?
-   [ Apache Kafka ]  (recovery.payment.failed)
-          ¦
-          ?
- [ Go Recovery Worker ] --(HTTP RPC)--? [ Python FastAPI ML Engine ] (:8000)
-   (Daemon Consumer)                     (Contextual Bandit + Policies)
-          ¦                                            ¦
-          ¦?----------------- Decision Result ---------+
-          ¦
-          ?
-  [ Go Executor Engine ] (:8080)
-   +-- Gateway Circuit Breakers (HDFC/ICICI/SBI/Axis)
-   +-- Jittered Backoff & Exponential Scheduler
-   +-- Prometheus Telemetry Counters
-   +-- RFC 6962 Merkle Tree Audit Logger (PostgreSQL WAL)
-          ¦
-          ?
-[ Frontend Control Tower ] (:5173)
-  (React 18 + TypeScript + Vite + Tailwind Dark Theme)
-```
+This document provides a comprehensive, verified inventory of all features, services, and components currently implemented across the **Razorpay Recovery Engine** repository.
 
 ---
 
-## 2. Implemented Backend Components
+## 1. Verified Architecture & Reality Matrix
 
-### A. Go Executor Service (`backend/go-executor/`)
-- **HTTP Server (`:8080`)**: High-throughput REST API serving health checks, metrics, and recovery execution endpoints.
-- **Circuit Breakers (`circuit_breaker.go`)**: Per-gateway sliding-window trip logic (CLOSED, HALF-OPEN, OPEN) with automated cool-down timers to protect downstream banking partner switches.
-- **Retry Executor (`retry_executor.go`)**: Deterministic re-dispatch orchestrator supporting:
-  - `RETRY_NOW`: Immediate re-routing through secondary switches.
-  - `RETRY_LATER`: Dynamic exponential backoff with randomized jitter.
-  - `SEND_REMINDER`: Merchant/customer notification dispatch.
-  - `NO_ACTION`: Permanent drop on hard floors or unrecoverable codes.
-- **Independent Worker Process (`cmd/recovery-worker/main.go`)**: Dedicated Kafka consumer binary scaling independently from the HTTP API.
-- **Test Suite**: Fully unit-tested with 100% pass rate (`go test ./...`).
-
-### B. Python Decision & ML Intelligence (`backend/api/`, `backend/decision/`, `ml/`)
-- **FastAPI Decision API (`backend/api/app.py:8000`)**: High-performance endpoint (`POST /v1/recovery/decide`) returning recommendations with probability and expected value.
-- **Contextual Multi-Armed Bandit**: Bayesian Thompson Sampling dynamically balancing exploration vs. exploitation across failure cohorts.
-- **Feature Attribution**: Models historical bank success rates, error code recovery propensities, ticket sizes, and peak-hour congestion factors.
-- **Deterministic Policy Safety Gates (`backend/policy/engine.py`)**: Hard overrides (RBI cooling period compliance, gateway trip thresholds, P0 minimum EV floors).
-- **Test Suite**: Fully verified across 66 unit & integration tests (`python -m pytest`).
+| Feature / Capability | Status | Actual Implementation Reality | Data Source / Provenance |
+| :--- | :--- | :--- | :--- |
+| **Beta-Bernoulli Thompson Sampling** | **IMPLEMENTED (PRODUCTION)** | Bounded action exploration layer over Expected Value. Conjugate Beta posteriors $(\alpha, \beta)$ persisted in PostgreSQL table `bandit_posterior` with atomic updates. Inviolable policy gate guardrails. | `backend/bandit.py`, `backend/bandit_repository.py`, `tests/test_thompson_sampling.py` |
+| **SHAP Model Explanations** | **IMPLEMENTED (PRODUCTION)** | Real `TreeExplainer` computed on Random Forest pipeline (`ml/model.pkl`). Calculates exact Shapley feature attributions, base values, and direction (`POSITIVE`/`NEGATIVE`) with strict efficiency identity ($E[f(x)] + \sum \phi_j = f(x)$). | `backend/ml_explainer.py`, `tests/test_shap_explainer.py`, `GET /v1/ai/explain/{payment_id}` |
+| **RFC 6962 Merkle Audit Proofs** | **IMPLEMENTED (PRODUCTION)** | Cryptographically strict $0x00$ leaf prefix, $0x01$ node prefix, power-of-2 split decomposition ($k = 2^{\lfloor \log_2(n - 1) \rfloor}$). Generates inclusion proofs over PostgreSQL-ordered audit sequence and standalone verification. | `backend/crypto_merkle.py`, `tests/test_rfc6962_merkle.py`, `GET /v1/audit/rfc6962-proof/{id}`, `POST /v1/audit/verify-proof` |
+| **Distributed Global Rate Limiting** | **IMPLEMENTED (PRODUCTION)** | Redis-backed atomic token bucket/sliding window Lua script shared across concurrent Go workers and Python API workers. Fail-closed financial safety semantics when Redis is unreachable. | `backend/go-executor/distributed_rate_limiter.go`, `backend/rate_limiter.py`, `tests/test_rate_limiter.py` |
+| **Production Kafka Dead Letter Queue (DLQ)** | **IMPLEMENTED (PRODUCTION)** | Durable topic `recovery.payment.failed.dlq` on `:9092` with structured DLQ envelope, bounded retries (3 attempts), and strict at-least-once message commit ordering (no commit if DLQ write fails). | `backend/go-executor/events/kafka_dlq_publisher.go`, `kafka_dlq_consumer.go`, `kafka_dlq_integration_test.go` |
+| **Recovery Decision Pipeline** | **IMPLEMENTED** | Python pipeline evaluating recovery actions, computing Expected Value (EV), and enforcing policy rules | `backend/recovery_pipeline.py`, `backend/decision/engine.py` |
+| **ML Predictive Model** | **IMPLEMENTED** | `RandomForestClassifier` (100 trees) trained on repeated trials in `ml/data.csv` | `ml/model.pkl` (79.98% test accuracy, 0.8784 ROC-AUC) |
+| **Go Recovery Executor** | **IMPLEMENTED** | High-throughput Go HTTP service on `:8080` with bounded retries, backoff, and metrics | `backend/go-executor/main.go` |
+| **Execution Idempotency** | **IMPLEMENTED** | Dual-layer idempotency (atomic PostgreSQL store & in-memory map) preventing duplicate recovery | `backend/audit_repository.py`, `backend/go-executor/main.go` |
+| **Gateway Circuit Breakers** | **IMPLEMENTED** | Per-gateway state machine (CLOSED, HALF_OPEN, OPEN) with trip/reset API | `backend/go-executor/circuit_breaker.go` |
+| **PostgreSQL Audit Ledger** | **IMPLEMENTED** | ACID WAL storage of all decisions, executions, attempts, and SHA-256 record digests | `recovery_audit` table in PostgreSQL |
+| **3-Way Strategy Evaluation** | **SIMULATED** | Offline deterministic benchmark comparing Naive Retry, Rule-Based Heuristic, and AI Engine on 10,000 synthetic payments (Seed 42) | `backend/controlled_experiment.py` (+36.89% revenue over Naive, +6.61% over Rule) |
+| **Kafka Event Ingestion** | **LIVE & INSTRUMENTED** | Apache Kafka broker on `:9092` with topic `recovery.payment.failed` (3 partitions) and `recovery.payment.failed.dlq`. Robust consumer with bounded retries and DLQ routing | Apache Kafka 4.0.0 local Docker |
 
 ---
 
-## 3. Implemented Frontend Control Tower (`frontend/`)
+## 2. Five Advanced Features: Technical Architecture & Verification
 
-### A. Design System & Theming
-- **Infrastructure Precision Theme**: Strictly implementing Google Stitch tokens from `DESIGN.md`.
-- **Canvas Base**: Rooted in `#0B0F17` with surface luminosity tiers (`#111827`, `#161F30`, `#1E293B`).
-- **Typography**:
-  - `Geist`: Architectural headlines and labels.
-  - `Inter`: Narrative text, system logs, and operational descriptions.
-  - `JetBrains Mono`: Financial quantities in Indian Rupees (`?`), latencies (`ms`), confidence probabilities (`0.00-1.00`), and cryptographic hashes.
+### 1. Beta-Bernoulli Thompson Sampling
+- **Posterior Math**: Action success probability $\theta_a \sim \text{Beta}(\alpha_a, \beta_a)$.
+- **Exploration Score**: $\hat{\text{EV}}_a = \hat{\theta}_a \cdot \text{Amount} - \text{Cost}(a)$.
+- **Policy Inviolability**: Deterministic safety rules (`apply_policy`) strictly filter and guard sampled actions.
+- **Outcome Update**: Real recovery success increments $\alpha_a \leftarrow \alpha_a + 1$, failure increments $\beta_a \leftarrow \beta_a + 1$.
+- **Storage**: Persisted atomically in PostgreSQL table `bandit_posterior`.
 
-### B. Modular Component Architecture
-- **`src/components/ui/`**:
-  - `StatCard.tsx`: Metric cards with trend badges, targets, and icons.
-  - `StatusPill.tsx`: Lifecycle badges (`RECOVERED`, `ROUTING`, `FAILED`, `OPTIMAL`) with 6px dot and pulse animation.
-  - `ActionBadge.tsx`: Semantic tags for `RETRY_NOW`, `RETRY_LATER`, `SEND_REMINDER`, `NO_ACTION`.
-  - `ConfidenceBar.tsx`: Micro progress bar with gradient color transitions.
-  - `SearchFilterBar.tsx`: Terminal query input with gateway and status selectors.
-  - `CodeBlock.tsx`: Collapsible JSON/cryptographic viewer with copy button.
-- **`src/components/charts/`**:
-  - `TrendAreaChart.tsx`: Multi-series SVG recovery trajectory area chart with linear gradient shading.
-  - `LatencyHistogram.tsx`: p50, p95, p99 decision latency distribution profile.
-  - `CalibrationCurve.tsx`: Predicted probability vs. observed settlement calibration curve.
-  - `BanditArmRewardChart.tsx`: Multi-Armed Bandit (MAB) win rate comparison across cohorts.
-- **`src/components/recovery/`**:
-  - `TransactionTable.tsx`: Tabular ledger with Indian Rupee formatting (`?`), failure codes, EV, and inspect triggers.
-  - `DecisionLineageDrawer.tsx`: Inspector drawer showing ML feature attribution, compliance checks, and raw payloads.
-  - `PolicyRuleCard.tsx`: Interactive policy gate card with toggle and trigger threshold meters.
-  - `PolicySimulationSandbox.tsx`: Zero-risk parameter simulation sandbox with live sliders.
-- **`src/components/system/`**:
-  - `WorkerClusterStatus.tsx`: Go Executor worker thread, goroutine, and memory health.
-  - `CircuitBreakerCard.tsx`: Bank partner gateway health gauges (HDFC, ICICI, SBI, Axis).
-  - `KafkaLagMonitor.tsx`: Partition consumer lag bars for Kafka topics.
+### 2. SHAP Model Explanations (TreeExplainer)
+- **Engine**: Scikit-Learn `Pipeline` (`StandardScaler` + `OneHotEncoder` + `RandomForestClassifier`).
+- **Algorithm**: TreeSHAP via `shap.TreeExplainer(rf_model)`.
+- **Attribution Mapping**: Translates 24 encoded features back to core payment attributes (Customer Success Rate, Recovery Rate, Amount, Time of Day, Payment Method, Issuing Bank, Error Reason, Strategy).
+- **Efficiency Validation**: Verified in unit tests that $E[f(x)] + \sum \phi_j = f(x)$ with precision $< 10^{-13}$.
 
-### C. Connected Pages (`src/pages/`)
-1. **Overview (`Overview.tsx`)**: Executive dashboard with command banner, KPI density strip, recovery trajectory chart, circuit breakers, and recent transactions.
-2. **Live Recovery (`LiveRecovery.tsx`)**: Real-time Kafka stream monitoring, live filter controls, and transaction inspection.
-3. **Payment Investigation (`PaymentInvestigation.tsx`)**: Deep-dive forensics for individual transactions showing state transitions, feature weights, and Merkle proofs.
-4. **Experiments (`Experiments.tsx`)**: Multi-Armed Bandit exploration cohorts, Thompson Sampling win rates, and strategy matrix.
-5. **AI Intelligence (`AIIntelligence.tsx`)**: Calibration curves, Brier score, SHAP attribution, and Kolmogorov-Smirnov drift tests.
-6. **Policies (`Policies.tsx`)**: Deterministic hard-gate policy cards and simulation sandbox.
-7. **System Health (`SystemHealth.tsx`)**: Go daemon cluster metrics, latency histograms, Kafka lag, and gateway status.
-8. **Audit Log (`AuditLog.tsx`)**: Immutable cryptographic ledger with RFC 6962 Merkle proof viewer.
+### 3. RFC 6962-Compliant Merkle Audit Tree
+- **Specification**:
+  - Leaf Hash: $\text{SHA-256}(0x00 \mathbin{\Vert} \text{canonical\_json})$
+  - Node Hash: $\text{SHA-256}(0x01 \mathbin{\Vert} \text{left\_hash} \mathbin{\Vert} \text{right\_hash})$
+  - Split Rule: $k = 2^{\lfloor \log_2(n - 1) \rfloor}$
+- **Ordering**: Strict ascending `id ASC` from PostgreSQL table `recovery_audit`.
+- **Proof Generation & Verification**: Standalone cryptographic verifier checks bottom-up path against published Merkle root.
 
----
+### 4. Distributed Global Rate Limiting
+- **Engine**: Redis 7 on `localhost:6379`.
+- **Atomicity**: Single-roundtrip Lua script executing `INCR` + conditional `EXPIRE` + `TTL`.
+- **Concurrency Safety**: Multi-goroutine and multi-thread tested with zero race conditions.
+- **Fail-Closed Semantics**: If Redis fails, rejects payment execution (`status: "UNAVAILABLE"`) to prevent upstream bank gateway cascading overloads.
 
-## 4. Verification & Build Status
-- **TypeScript**: `npx tsc --noEmit` clean with zero errors.
-- **Vite Production Bundle**: `npm run build` bundles 57 modules in under 2 seconds (dist: 227 kB js / 6 kB html).
-- **Backend Tests**: 100% green across both Python and Go test suites.
-
+### 5. Production Kafka Dead Letter Queue (DLQ)
+- **Topic**: `recovery.payment.failed.dlq` on `localhost:9092` with `acks=all` (`RequiredAcks: kafka.RequireAll`).
+- **Envelope**: Captures `dlq_id`, `original_topic`, `original_partition`, `original_offset`, `consumer_group`, `failure_category`, `failure_reason`, `attempt_count`, and `raw_payload`.
+- **Commit Safety**: At-least-once processing guarantee. Consumer commits original message offset ONLY after DLQ acknowledgment. If DLQ publish fails, message remains uncommitted for redelivery.

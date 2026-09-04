@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
@@ -27,8 +27,8 @@ class RecoveryDecisionResponse(BaseModel):
 class TransactionItem(BaseModel):
     payment_id: str
     timestamp: str
-    method: str
-    bank: str
+    method: Optional[str] = "UNAVAILABLE"
+    bank: Optional[str] = "UNAVAILABLE"
     amount: float
     failure_code: str
     expected_value: float
@@ -53,13 +53,19 @@ class CircuitBreakerOverview(BaseModel):
     failure_count: int
     failure_threshold: int
     last_trip_time: Optional[str] = None
+    status: Optional[str] = "LIVE"
+    source: Optional[str] = "go-executor"
 
 
 class OverviewSummaryResponse(BaseModel):
+    status: str = "LIVE"
+    source: str = "postgres.recovery_audit"
     at_risk_revenue: float
     recovered_revenue: float
     recovery_rate: float
     ai_lift: float
+    ai_lift_status: str = "SIMULATED"
+    ai_lift_source: str = "simulator.controlled_experiment (Seed 42)"
     active_in_flight: int
     trajectory_series: List[TrajectoryPoint]
     circuit_breakers: List[CircuitBreakerOverview]
@@ -79,8 +85,8 @@ class AuditDetailResponse(BaseModel):
     payment_id: str
     customer_id: str
     amount: float
-    payment_method: str
-    bank: str
+    payment_method: Optional[str] = "UNAVAILABLE"
+    bank: Optional[str] = "UNAVAILABLE"
     failure_code: str
     probabilities: Dict[str, float]
     recommended_action: str
@@ -97,6 +103,8 @@ class AuditDetailResponse(BaseModel):
     merkle_proof: Optional[List[str]] = None
     state_steps: Optional[List[StateStepItem]] = None
     raw_payload: Optional[Dict[str, Any]] = None
+    status: str = "LIVE"
+    source: str = "postgres.recovery_audit"
 
 
 class MABArm(BaseModel):
@@ -112,12 +120,14 @@ class MABArm(BaseModel):
 
 class MABExperimentResponse(BaseModel):
     experiment_id: str
-    status: str
+    experiment_type: str = "3-WAY_CONTROLLED_EXPERIMENT"
+    status: str = "SIMULATED_EXPERIMENT"
+    source: str = "simulator.controlled_experiment"
     total_trials: int
     active_arms_count: int
     exploration_allocation: float
     ai_lift_vs_rule: float
-    statistical_p_value: float
+    statistical_p_value: Optional[float] = None
     winning_arm: str
     arms: List[MABArm]
 
@@ -140,6 +150,8 @@ class FeatureImportanceItem(BaseModel):
 
 
 class AIModelHealthResponse(BaseModel):
+    status: str = "EVALUATION"
+    source: str = "model.evaluation_dataset (ml/data.csv, 59,380 trials)"
     model_name: str
     accuracy: float
     precision: float
@@ -150,7 +162,8 @@ class AIModelHealthResponse(BaseModel):
     cv_roc_auc_std: float
     brier_score: float
     ece: float
-    concept_drift_psi: float
+    concept_drift_psi: Optional[float] = None
+    drift_status: str = "UNAVAILABLE (Requires continuous production streaming feature store)"
     calibration_curve: List[CalibrationPoint]
     latency: LatencyQuantiles
     feature_importances: List[FeatureImportanceItem]
@@ -177,6 +190,8 @@ class PolicySimulateRequest(BaseModel):
 
 
 class PolicySimulateResponse(BaseModel):
+    status: str = "SIMULATED"
+    source: str = "policy_simulation_sandbox"
     simulated_recovery_rate: float
     simulated_recovered_revenue: float
     simulated_blocked_count: int
@@ -195,15 +210,21 @@ class AuditLedgerEntry(BaseModel):
 
 
 class AuditLedgerResponse(BaseModel):
+    status: str = "LIVE"
+    source: str = "postgres.recovery_audit"
+    ledger_type: str = "SHA-256 Audit Digest Chain (PostgreSQL ACID WAL)"
     total_records: int
     merkle_root: str
     tree_height: int
-    tamper_proof: bool
-    active_wal_replicas: int
+    tamper_proof: bool = False
+    active_wal_replicas: int = 1
     entries: List[AuditLedgerEntry]
 
 
 class MerkleProofResponse(BaseModel):
+    status: str = "LIVE"
+    source: str = "postgres.recovery_audit"
+    proof_type: str = "SHA-256 Digest Verification (RFC 6962 tree proofs unavailable)"
     payment_id: str
     leaf_hash: str
     merkle_root: str
@@ -214,29 +235,34 @@ class MerkleProofResponse(BaseModel):
 class KafkaPartitionLag(BaseModel):
     partition: int
     topic: str
-    current_offset: int
-    log_end_offset: int
-    lag: int
-    status: str
+    current_offset: Optional[int] = None
+    log_end_offset: Optional[int] = None
+    lag: Optional[int] = None
+    status: str = "UNAVAILABLE"
+    source: Optional[str] = "kafka:9092"
 
 
 class LiveRecoveryStreamResponse(BaseModel):
-    streaming_rate: str
-    instant_recovery_p95: str
-    decision_p99_latency_ms: str
-    kafka_lag_msgs: str
-    partitions: List[KafkaPartitionLag]
-    trend_data: List[TrajectoryPoint]
+    status: str = "UNAVAILABLE"
+    source: str = "kafka.runtime"
+    message: Optional[str] = "Kafka live ingestion metrics uninstrumented in local dev"
+    streaming_rate: Optional[str] = "UNAVAILABLE"
+    instant_recovery_p95: Optional[str] = "UNAVAILABLE"
+    decision_p99_latency_ms: Optional[str] = "UNAVAILABLE"
+    kafka_lag_msgs: Optional[str] = "UNAVAILABLE"
+    partitions: List[KafkaPartitionLag] = []
+    trend_data: List[TrajectoryPoint] = []
 
 
 class NodeStatus(BaseModel):
+    status: str = "HEALTHY"
+    source: str = "go-executor"
     node_id: str
     uptime_seconds: float
     goroutines: int
     memory_alloc_mb: float
     memory_sys_mb: float
     num_gc: int
-    status: str
     active_workers: int
     queue_depth: int
     throughput_ops_sec: float
@@ -249,11 +275,113 @@ class LatencyBucket(BaseModel):
 
 
 class SystemHealthResponse(BaseModel):
-    executor_throughput: str
-    kafka_ingestion_lag: str
-    p99_execution_time: str
-    postgres_wal_sync: str
-    node_status: NodeStatus
-    circuit_breakers: List[CircuitBreakerOverview]
-    kafka_partitions: List[KafkaPartitionLag]
-    latency_histogram: List[LatencyBucket]
+    status: str = "LIVE"
+    executor_throughput: Optional[str] = "UNAVAILABLE"
+    kafka_ingestion_lag: Optional[str] = "UNAVAILABLE"
+    p99_execution_time: Optional[str] = "UNAVAILABLE"
+    postgres_wal_sync: Optional[str] = "UNAVAILABLE"
+    node_status: Optional[NodeStatus] = None
+    circuit_breakers: List[CircuitBreakerOverview] = []
+    kafka_partitions: List[KafkaPartitionLag] = []
+    latency_histogram: List[LatencyBucket] = []
+
+
+# ==========================================
+# 11. Advanced Production Feature Schemas
+# ==========================================
+
+class BanditArmState(BaseModel):
+    action: str
+    alpha: float
+    beta: float
+    mean_reward: float
+    variance: float
+    credible_interval_95: List[float]
+    successes: int
+    failures: int
+    total_pulls: int
+    updated_at: Optional[str] = None
+
+
+class BanditStateResponse(BaseModel):
+    status: str = "LIVE"
+    algorithm: str = "Beta-Bernoulli Thompson Sampling"
+    priors: str = "Beta(1.0, 1.0) Uniform"
+    total_decisions: int
+    arms: List[BanditArmState]
+
+
+class SHAPFeatureAttribution(BaseModel):
+    feature: str
+    raw_value: Any
+    shap_value: float
+    direction: str
+    importance_rank: int
+
+
+class SHAPExplanationResponse(BaseModel):
+    payment_id: Optional[str] = None
+    model_name: str = "RandomForestClassifier"
+    base_value: float
+    output_probability: float
+    prediction_label: str
+    attributions: List[SHAPFeatureAttribution]
+
+
+class RFC6962MerkleRootResponse(BaseModel):
+    root_hash: str
+    tree_size: int
+    latest_leaf_id: Optional[int] = None
+    algorithm: str = "RFC 6962 SHA-256 Merkle Tree"
+    leaf_prefix: str = "0x00"
+    node_prefix: str = "0x01"
+    timestamp: str
+
+
+class RFC6962ProofStep(BaseModel):
+    direction: str
+    hash: str
+
+
+class RFC6962MerkleProofResponse(BaseModel):
+    payment_id: str
+    leaf_index: int
+    tree_size: int
+    leaf_hash: str
+    audit_path: List[RFC6962ProofStep]
+    root_hash: str
+    verified: bool
+
+
+class VerifyProofRequest(BaseModel):
+    leaf_hash: str
+    leaf_index: int
+    tree_size: int
+    audit_path: List[RFC6962ProofStep]
+    expected_root: str
+
+
+class VerifyProofResponse(BaseModel):
+    valid: bool
+    computed_root: str
+    expected_root: str
+    message: str
+
+
+class RateLimiterStatusResponse(BaseModel):
+    status: str = "LIVE"
+    source: str = "redis:6379"
+    key: str
+    limit: int
+    window_seconds: int
+    current_tokens: int
+    remaining_tokens: int
+    ttl_seconds: int
+    allowed: bool
+
+
+class KafkaDLQStatsResponse(BaseModel):
+    status: str = "LIVE"
+    topic: str = "recovery.payment.failed.dlq"
+    total_dead_letters: int
+    sample_dead_letters: List[Dict[str, Any]] = []

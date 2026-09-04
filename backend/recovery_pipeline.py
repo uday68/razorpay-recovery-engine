@@ -16,6 +16,9 @@ from backend.recovery_executor import RecoveryExecutor
 from backend.go_executor_client import GoExecutorClient
 
 
+from backend.bandit import ThompsonSamplingBandit
+
+
 ACTIONS = [
     "RETRY_NOW",
     "RETRY_LATER",
@@ -33,6 +36,7 @@ class RecoveryPipeline:
     ):
         self.model = load_model()
         self.audit_repository = AuditRepository(database_url)
+        self.bandit = ThompsonSamplingBandit(database_url=database_url)
         self.executor = RecoveryExecutor()
         self.go_executor_url = go_executor_url
         self.go_executor = (
@@ -105,7 +109,13 @@ class RecoveryPipeline:
             probabilities,
         )
 
-        recommended_action = decision["action"]
+        # Thompson Sampling Bandit exploration bounded over eligible actions
+        bandit_result = self.bandit.sample_arm(
+            eligible_actions=list(probabilities.keys()),
+            amount=amount,
+            model_probabilities=probabilities,
+        )
+        recommended_action = bandit_result["selected_action"]
 
         selected_probability = probabilities[
             recommended_action
@@ -142,6 +152,13 @@ class RecoveryPipeline:
         if "attempts" not in execution_result:
             execution_result["attempts"] = 1
 
+        # Update bandit posterior on actual recovery outcome
+        if executed_action != "NO_ACTION":
+            self.bandit.update(
+                action=executed_action,
+                success=bool(execution_result.get("recovered", False)),
+            )
+
         audit_event = create_audit_event(
             payment_id=payment_id,
             customer_id=customer_id,
@@ -154,6 +171,8 @@ class RecoveryPipeline:
             policy_reason=policy["reason"],
             executed_action=executed_action,
             execution_result=execution_result,
+            bank=bank,
+            payment_method=payment_method,
         )
 
         self.audit_repository.save(
@@ -176,5 +195,10 @@ class RecoveryPipeline:
             ),
             "recovery_command": command,
             "execution_result": execution_result,
+            "bandit_exploration": {
+                "selected_action": bandit_result["selected_action"],
+                "sampled_probabilities": bandit_result["sampled_probabilities"],
+                "sampled_expected_values": bandit_result["sampled_expected_values"],
+            },
         }
    

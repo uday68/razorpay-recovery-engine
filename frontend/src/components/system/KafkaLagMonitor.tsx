@@ -2,10 +2,10 @@ import React from "react";
 
 export interface KafkaPartitionLag {
   partition: number;
-  currentOffset: number;
-  logEndOffset: number;
-  lag: number;
-  status: "NORMAL" | "CONGESTED";
+  currentOffset?: number | null;
+  logEndOffset?: number | null;
+  lag?: number | null;
+  status: string;
 }
 
 export interface KafkaLagMonitorProps {
@@ -14,38 +14,38 @@ export interface KafkaLagMonitorProps {
 }
 
 const defaultPartitions: KafkaPartitionLag[] = [
-  { partition: 0, currentOffset: 894102, logEndOffset: 894104, lag: 2, status: "NORMAL" },
-  { partition: 1, currentOffset: 912800, logEndOffset: 912803, lag: 3, status: "NORMAL" },
-  { partition: 2, currentOffset: 881940, logEndOffset: 881941, lag: 1, status: "NORMAL" },
-  { partition: 3, currentOffset: 904320, logEndOffset: 904325, lag: 5, status: "NORMAL" },
+  { partition: 0, status: "ACTIVE" },
+  { partition: 1, status: "ACTIVE" },
+  { partition: 2, status: "ACTIVE" },
 ];
 
 export const KafkaLagMonitor: React.FC<KafkaLagMonitorProps> = ({
   topic = "recovery.payment.failed",
   partitions = defaultPartitions,
 }) => {
-  const totalLag = partitions.reduce((sum, p) => sum + p.lag, 0);
+  const hasLagData = partitions.some((p) => p.lag !== null && p.lag !== undefined);
+  const totalLag = hasLagData ? partitions.reduce((sum, p) => sum + (p.lag || 0), 0) : null;
 
   return (
     <div className="flex flex-col p-space-base rounded-lg bg-surface-container border border-surface-container-high/60 gap-space-sm">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-headline-sm text-headline-sm text-on-surface font-medium">
-            Kafka Consumer Group Lag: {topic}
+            Kafka Partition Status: {topic}
           </h3>
           <p className="font-body-sm text-body-sm text-outline">
-            Partition offset consumption rate vs broker commit log
+            Topic partition topology (3 partitions configured on broker localhost:9092)
           </p>
         </div>
         <div className="flex items-center gap-space-xs font-mono-code text-[11px]">
-          <span className="text-outline">Total Consumer Lag:</span>
+          <span className="text-outline">Broker Status:</span>
           <span className="text-secondary font-bold px-space-xs py-0.5 rounded bg-secondary/10 border border-secondary/20">
-            {totalLag} msgs
+            {hasLagData ? `${totalLag} msgs lag` : "BROKER ONLINE (Lag Uninstrumented)"}
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-sm mt-space-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-space-sm mt-space-xs">
         {partitions.map((p) => (
           <div
             key={p.partition}
@@ -55,17 +55,13 @@ export const KafkaLagMonitor: React.FC<KafkaLagMonitorProps> = ({
               <span className="text-primary font-semibold">
                 Partition #{p.partition}
               </span>
-              <span className="text-secondary font-medium">{p.lag} lag</span>
-            </div>
-            <div className="h-1.5 w-full bg-surface-container-highest rounded-full overflow-hidden mt-1">
-              <div
-                className="h-full bg-secondary rounded-full"
-                style={{ width: `${Math.min(100, Math.max(10, p.lag * 10))}%` }}
-              />
+              <span className="text-secondary font-medium">
+                {p.lag !== null && p.lag !== undefined ? `${p.lag} lag` : p.status || "ACTIVE"}
+              </span>
             </div>
             <div className="flex justify-between text-outline text-[10px] mt-1">
-              <span>Offset: {p.currentOffset}</span>
-              <span>Head: {p.logEndOffset}</span>
+              <span>Offset: {p.currentOffset !== null && p.currentOffset !== undefined ? p.currentOffset : "Uninstrumented"}</span>
+              <span>Head: {p.logEndOffset !== null && p.logEndOffset !== undefined ? p.logEndOffset : "Uninstrumented"}</span>
             </div>
           </div>
         ))}
@@ -75,4 +71,3 @@ export const KafkaLagMonitor: React.FC<KafkaLagMonitorProps> = ({
 };
 
 export default KafkaLagMonitor;
-

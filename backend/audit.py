@@ -13,6 +13,9 @@ def create_audit_event(
     policy_reason,
     executed_action,
     execution_result=None,
+    bank=None,
+    payment_method=None,
+    event_id=None,
 ):
     event = {
         "payment_id": payment_id,
@@ -25,6 +28,9 @@ def create_audit_event(
         "policy_allowed": policy_allowed,
         "policy_reason": policy_reason,
         "executed_action": executed_action,
+        "bank": bank,
+        "payment_method": payment_method,
+        "event_id": event_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 

@@ -1,215 +1,478 @@
-# Razorpay Recovery Engine
+﻿<div align="center">
 
-The Razorpay Recovery Engine is a simulated framework and pipeline designed to optimize the recovery of failed payment transactions. It utilizes Machine Learning to predict the best recovery action, a Policy Engine to enforce business rules, and a robust Backend Pipeline for audit trailing and idempotency.
+# ⚡ Razorpay AI Revenue Recovery Engine
 
-## Project Architecture
+### *Turn payment failures into recovered revenue — intelligently, reliably, and verifiably.*
 
-The repository is divided into several core modules:
+<br/>
 
-### 1. `simulator/` (Data Generation & Simulation)
-Simulates Razorpay customers and payment failures. 
-- **`generator.py`**: Generates synthetic, deterministic data for customers and failed payments.
-- **`recovery.py`**: Defines the ground-truth probabilities for different recovery actions across various payment failure codes (`BANK_TIMEOUT`, `INSUFFICIENT_FUNDS`, etc.).
-- **`models.py`**: Pydantic/dataclass models for `Customer` and `Payment`.
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Go](https://img.shields.io/badge/Go-1.22-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
+[![Kafka](https://img.shields.io/badge/Apache_Kafka-231F20?style=for-the-badge&logo=apache-kafka&logoColor=white)](https://kafka.apache.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://postgresql.org)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
 
-### 2. `ml/` (Machine Learning)
-Trains and serves the predictive model.
-- **`dataset.py`**: Uses the simulator to build a training dataset (`data.csv`) of payment failures and action success rates.
-- **`train.py`**: Trains a `RandomForestClassifier` on the generated dataset to learn non-linear interactions between failure codes and optimal actions.
-- **`model_store.py`**: Handles persistence of the trained model (`model.pkl`).
+<br/>
 
-### 3. `backend/` (Core Logic & Production Pipeline)
-The primary application backend where the ML model is operationalized.
-- **`decision/engine.py`**: Evaluates the probability predictions from the ML model and computes the *Expected Value* of each action (factoring in potential penalties for annoying the customer).
-- **`policy/engine.py`**: A rule-based engine that overrides ML decisions when strict business constraints are met (e.g., blocking `RETRY_NOW` for `BANK_TIMEOUT`, or skipping actions for massive transactions to minimize risk).
-- **`recovery_pipeline.py`**: The main entry point for processing failed payments. It orchestrates:
-  1. Idempotency checks to prevent duplicate processing.
-  2. Model prediction and policy evaluation.
-  3. Saving the complete audit trail.
-  4. Executing the final recovery action.
-- **`audit_repository.py`**: Connects to PostgreSQL to store the `recovery_audit` and `recovery_idempotency` records.
-- **`controlled_experiment.py` & `comparison.py`**: Tools to run simulated A/B tests comparing the AI Strategy against a Baseline Strategy (e.g., "always retry now") to measure revenue and recovery improvements.
+> **Razorpay AI Buildathon — Track 03: AI Revenue Recovery**
 
-### 4. `tests/` (Test Suite)
-Contains comprehensive `pytest` test coverage for:
-- Idempotency (`test_pipeline_idempotency.py`)
-- Policy Integration (`test_policy_integration.py`, `test_policy.py`)
-- Action Dynamics (`test_action_dynamics.py` ensuring the ML model differentiates actions)
-- Audit Logs (`test_audit.py`, `test_audit_repository.py`)
-- Stability Metrics (`test_stability_metrics.py`)
+</div>
 
-## Setup & Installation
+---
 
-1. **Install Dependencies:**
-   Ensure you have Python 3.12+ installed.
-   ```bash
-   pip install pandas scikit-learn psycopg pytest
-   ```
+## The Core Insight
 
-2. **Database Setup:**
-   The `RecoveryPipeline` requires a running PostgreSQL instance.
-   ```bash
-   # Default connection string used in tests:
-   postgresql://recovery:recovery@localhost:5432/recovery_engine
-   ```
+Payment failures are not simply failed transactions — they are **revenue at risk**.
 
-3. **Train the Model:**
-   Generate the dataset and train the ML model.
-   ```bash
-   python -m ml.dataset
-   python -m ml.train
-   ```
+A naive system retries everything. That wastes recovery budget on payments that will never succeed and misses high-value opportunities that needed a different intervention.
 
-## Running Tests
+This system asks a more precise question for every failure:
 
-Run the full pytest suite from the root directory:
-```bash
-python -m pytest
+> **Which recovery action has the highest expected economic value — and is it safe to execute?**
+
+The answer emerges from a layered pipeline:
+
+```
+AI Prediction  →  Economic Optimization  →  Thompson Sampling  →  Policy Gate  →  Reliable Execution
 ```
 
-## Running an Experiment
+The AI never controls execution directly. The policy layer always has the final word.
 
-To compare the AI Recovery Engine's performance in a **3-Way Controlled Experiment** against both the Naive Baseline ("Always Retry") and the Heuristic Baseline ("Rule-Based"):
+---
+
+## Verified Results
+
+Controlled experiment across **10,000 synthetic payments** (2,978 failures, seed 42):
+
+| Strategy | Recovered | Rate | Revenue |
+|---|---:|---:|---:|
+| 🔴 Naive Always-Retry | 1,173 | 39.39% | ₹6.03M |
+| 🟡 Rule-Based Heuristic | 1,529 | 51.34% | ₹7.74M |
+| 🟢 **AI EV Engine** | **1,616** | **54.26%** | **₹8.26M** |
+
+**AI lift vs. rule-based: +6.61% → ≈ ₹512K additional recovered revenue**
+
+Across 5 independent seeds: mean lift **+6.85%** ± 1.05 pp, positive on all 5 runs.
+
+> These are **local simulator / controlled experiment results** — not production Razorpay traffic claims.
+
+---
+
+## Architecture
+
+### Decision Pipeline
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                         PAYMENT FAILURE                          │
+└─────────────────────────────┬────────────────────────────────────┘
+                              │
+                              ▼
+          ┌───────────────────────────────────┐
+          │           Apache Kafka            │
+          │     topic: recovery.payment.failed│
+          └─────────────────┬─────────────────┘
+                            │ at-least-once delivery
+                            ▼
+          ┌───────────────────────────────────┐
+          │         Recovery Worker           │
+          │  ✓ Event idempotency check        │
+          │  ✓ Distributed rate limit (Redis) │
+          └─────────────────┬─────────────────┘
+                            │
+                            ▼
+          ┌───────────────────────────────────┐
+          │      Python AI Decision Engine    │
+          │                                   │
+          │  Random Forest                    │
+          │    → P(success | context, action) │
+          │                                   │
+          │  Expected Value                   │
+          │    → EV(a) = P × Amount − Cost(a) │
+          │    → argmax EV(a)                 │
+          │                                   │
+          │  Thompson Sampling                │
+          │    → Beta(α,β) per action         │
+          │    → exploration–exploitation     │
+          │                                   │
+          │  Policy Gate  ← deterministic     │
+          │    → P < 0.50 → NO_ACTION         │
+          └─────────────────┬─────────────────┘
+                            │  Recovery Command
+                            ▼
+          ┌───────────────────────────────────┐
+          │         Go Recovery Executor      │
+          │  ✓ Command idempotency            │
+          │  ✓ Bounded retries                │
+          │  ✓ Circuit breaker (per gateway)  │
+          │  ✓ Gateway execution              │
+          └──────┬────────────────────────────┘
+                 │
+        ┌────────┴────────┐
+        ▼                 ▼
+    SUCCESS           FAILURE
+        │                 │
+        ▼                 ▼
+  PostgreSQL         Kafka DLQ
+  Audit + Merkle     recovery.payment
+  Bandit reward      .failed.dlq
+  update
+```
+
+---
+
+### Failure & DLQ Path
+
+```
+Primary Topic
+      │
+      ▼
+  Recovery Worker
+      │
+      ├─► [success]  ──► commit offset
+      │
+      └─► [failure]
+              │
+              ▼
+         bounded retry
+              │
+              ▼
+         DLQ Publisher ──► recovery.payment.failed.dlq
+              │
+              ▼
+         commit original offset
+              ↑
+         (never commit before DLQ ACK)
+```
+
+---
+
+### Audit Integrity — RFC 6962 Merkle Tree
+
+```
+           ┌─── Root Hash ───┐
+           │                 │
+        H(01)             H(23)
+       /      \          /      \
+    H(0)     H(1)     H(2)     H(3)
+      │        │        │        │
+   Audit0   Audit1   Audit2   Audit3
+
+Leaf hash:  SHA256(0x00 ‖ data)
+Node hash:  SHA256(0x01 ‖ H_left ‖ H_right)
+```
+
+Individual inclusion proofs are generated and independently verifiable.
+
+---
+
+## Feature Status
+
+| Capability | Status | Notes |
+|---|:---:|---|
+| Random Forest decision model | ✅ Implemented | `ml/model.pkl`, 59K training rows |
+| Expected Value optimization | ✅ Implemented | `EV(a) = P × amount − cost` |
+| Thompson Sampling (Beta-Bernoulli) | ✅ Implemented | PostgreSQL `bandit_posterior` table |
+| SHAP model explanations | ✅ Implemented | `shap.TreeExplainer` on real RF model |
+| Deterministic policy gate | ✅ Implemented | `P < 0.50` → NO_ACTION |
+| Kafka event processing | ✅ Implemented | `recovery.payment.failed` topic |
+| Kafka Dead Letter Queue | ✅ Implemented | `recovery.payment.failed.dlq`, acks=all |
+| Event idempotency | ✅ Implemented | PostgreSQL `processed_events` |
+| Command idempotency | ✅ Implemented | PostgreSQL `executed_commands` |
+| Distributed rate limiting | ✅ Implemented | Redis atomic Lua token bucket |
+| Go execution service | ✅ Implemented | Bounded retry + circuit breaker |
+| RFC 6962 Merkle audit proofs | ✅ Implemented | SHA-256, 0x00/0x01 prefix, verifiable |
+| PostgreSQL audit layer | ✅ Implemented | `recovery_audit` table, WAL-logged |
+| React Control Tower | ✅ Implemented | 8 live-data pages |
+| Controlled 3-way experiment | ✅ Implemented | Deterministic, seed-reproducible |
+| Real gateway integration | 🔬 Simulated | Local deterministic simulator |
+| Production deployment | 🔮 Future | Requires production infrastructure |
+
+---
+
+## Technical Deep Dives
+
+<details>
+<summary><strong>📐 Expected Value Decision Model</strong></summary>
+
+For each candidate recovery action, the model estimates `P(Y=1 | X, a)` — the probability of successful recovery given payment context X and action a.
+
+This is converted to economic value:
+
+```
+EV(a) = P(success | X, a) × Amount − Cost(a)
+a*    = argmax EV(a)
+```
+
+**Example — pay_123, ₹5,000, BANK_TIMEOUT:**
+
+| Action | P(success) | Cost | EV |
+|---|---:|---:|---:|
+| RETRY_NOW | 0.42 | ₹2 | ₹2,098 |
+| **RETRY_LATER** | **0.71** | **₹2** | **₹3,548** ✓ |
+| SEND_REMINDER | 0.38 | ₹1 | ₹1,899 |
+| NO_ACTION | 0.03 | ₹0 | ₹0 |
+
+The policy gate then authorizes or blocks the selected action before any execution occurs.
+
+</details>
+
+<details>
+<summary><strong>🎲 Thompson Sampling (Beta-Bernoulli)</strong></summary>
+
+Thompson Sampling addresses exploration vs. exploitation across recovery action strategies. Each action maintains a Beta conjugate posterior:
+
+```
+θ_a ~ Beta(α_a, β_a)      (prior: α = β = 1)
+
+Successful recovery → α ← α + 1
+Failed recovery     → β ← β + 1
+```
+
+Posteriors are persisted in PostgreSQL `bandit_posterior` so state survives restarts.
+
+**Safety invariant:** Thompson Sampling informs selection but **always passes through the Policy Gate** before execution.
+
+</details>
+
+<details>
+<summary><strong>🔍 SHAP Explainability</strong></summary>
+
+For any prediction, the system decomposes the model output into per-feature contributions:
+
+```
+f(x) = φ₀ + Σᵢ φᵢ
+```
+
+**Example — RETRY_LATER selected (P = 0.73):**
+
+```
+Base value:          0.44
+
+Positive factors:
+  success_rate    +0.09
+  amount          +0.07
+  hour            +0.03
+
+Negative factors:
+  failure_code    −0.05
+  recovery_rate   −0.02
+
+Final output:        0.73
+```
+
+SHAP values are per-prediction explanations — distinct from Random Forest MDI feature importance, which is a global model property.
+
+</details>
+
+<details>
+<summary><strong>🔐 RFC 6962 Merkle Audit Proofs</strong></summary>
+
+Audit records are organized into a Merkle tree following the RFC 6962 Certificate Transparency specification:
+
+```
+Leaf hash:  SHA256(0x00 ‖ leaf_data)
+Node hash:  SHA256(0x01 ‖ H_left ‖ H_right)
+```
+
+For any audit record the system generates an inclusion proof: `Leaf → siblings → Root`.
+
+The proof can be independently verified without trusting the issuer. This provides cryptographic integrity detection — not immutable storage, which requires separate infrastructure.
+
+</details>
+
+<details>
+<summary><strong>⚡ Distributed Rate Limiting (Redis)</strong></summary>
+
+Without distributed rate limiting each worker tracks its own counter — the global limit can be exceeded.
+
+With Redis atomic Lua scripting all workers share one quota with zero race conditions:
+
+```
+Worker A ─┐
+Worker B ─┤── Redis Atomic Token Bucket ──► shared quota
+Worker C ─┘
+```
+
+**Failure policy: FAIL-CLOSED.** If Redis is unreachable, requests are rejected rather than silently bypassing the limit.
+
+</details>
+
+---
+
+## Data Provenance
+
+All dashboards and metrics explicitly label their source:
+
+| Label | Meaning |
+|---|---|
+| `LIVE` | Fetched from a running service at request time |
+| `SIMULATED BENCHMARK` | Controlled experiment on synthetic data |
+| `EVALUATION DATASET` | Offline model evaluation on `ml/data.csv` |
+| `UNAVAILABLE` | Dependency unreachable — never fabricated |
+
+---
+
+## Tech Stack
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                     Control Tower                        │
+│          React 18  •  TypeScript  •  Vite  •  Tailwind   │
+└─────────────────────────┬────────────────────────────────┘
+                          │ REST API
+┌─────────────────────────▼────────────────────────────────┐
+│                  Python AI Engine                        │
+│        FastAPI  •  scikit-learn  •  SHAP  •  Redis       │
+└──────┬───────────────────────────────────┬───────────────┘
+       │ Recovery Command                  │ Audit / State
+┌──────▼──────────┐             ┌──────────▼───────────────┐
+│  Go Executor    │             │       PostgreSQL          │
+│  Retry + CB     │             │  Audit • Idempotency      │
+│  Kafka DLQ      │             │  Bandit Posteriors        │
+└──────┬──────────┘             └──────────────────────────┘
+       │
+┌──────▼──────────┐   ┌────────────────────────────────────┐
+│  Apache Kafka   │   │             Redis                  │
+│  Event Bus      │   │  Distributed Rate Limiter          │
+└─────────────────┘   └────────────────────────────────────┘
+```
+
+---
+
+## Quick Start
+
+### 1 — Infrastructure
+
 ```bash
+docker compose up -d
+# starts PostgreSQL · Kafka · Redis
+```
+
+### 2 — Python Environment
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+### 3 — Services
+
+```bash
+# Python AI Decision API
+uvicorn backend.api.app:app --host 0.0.0.0 --port 8000
+
+# Go Executor + Recovery Worker
+cd backend/go-executor
+go run .
+
+# React Control Tower
+cd frontend && npm install && npm run dev
+```
+
+---
+
+## Testing
+
+```bash
+# Python — 104 tests
+pytest tests/ backend/api/ -v
+
+# Go — unit + integration + race detector
+cd backend/go-executor
+go test -race ./...
+
+# Frontend — TypeScript check + production bundle
+cd frontend && npm run build
+
+# Controlled 3-way experiment
 python backend/run_experiment.py
+
+# Stability benchmark (5 independent seeds)
+python backend/run_stability.py
 ```
-This outputs detailed metrics including total recoveries, revenue recovered, policy compliance rates, action distribution, and the net financial improvement the AI engine drives over both baselines.
-
-## Key Features
-- **Idempotency**: Prevents the same payment ID or recovery command from being executed multiple times across both Python and Go boundaries.
-- **Audit Logging**: Every decision and physical execution outcome is logged to PostgreSQL (`recovery_audit`), capturing probabilities, expected values, policy checks, attempts, and gateway statuses.
-- **Business Rule Enforcement**: The ML model recommends actions based on probability and expected value, but the Policy Engine enforces safety boundaries and fallbacks.
-- **Multi-Trial Trained ML**: Trained on 59,000+ repeated trials capturing ground-truth probability distributions across failure modes.
-
-## V1 Architecture & Proven Capabilities
-
-```text
-                    ┌──────────────────┐
-                    │   Python AI/ML   │
-                    │ Probability Model│
-                    └────────┬─────────┘
-                             │
-                             ▼
-                    ┌──────────────────┐
-                    │ Decision Engine  │
-                    │ Expected Value   │
-                    └────────┬─────────┘
-                             │
-                             ▼
-                    ┌──────────────────┐
-                    │  Policy Engine   │
-                    │ Guardrails       │
-                    └────────┬─────────┘
-                             │
-                      RecoveryCommand
-                             │
-                           HTTP
-                             ▼
-              ┌──────────────────────────┐
-              │       Go Executor        │
-              │                          │
-              │ Validation               │
-              │ Idempotency              │
-              │ Retry Policy             │
-              │ Failure Classification   │
-              │ Execution Outcome        │
-              │ Metrics                  │
-              └───────────┬──────────────┘
-                          │
-             ┌────────────┴─────────────┐
-             ▼                          ▼
-      ┌──────────────┐          ┌──────────────┐
-      │ PostgreSQL   │          │    Gateway   │
-      │ Idempotency  │          │  Simulator   │
-      │ Audit        │          │              │
-      └──────────────┘          └──────────────┘
-```
-
-### Verified V1 Capabilities
-
-| Requirement | Implementation & Proof | Status |
-| :--- | :--- | :---: |
-| **Structured recovery command** | JSON contract (`command_id`, `payment_id`, `action`, `amount`) | ✅ |
-| **Malformed command rejection** | Rejects invalid JSON schemas before entering execution | ✅ |
-| **Invalid action rejection** | Rejects unapproved action verbs (`STEAL_MONEY`, etc.) | ✅ |
-| **Amount validation** | Enforces positive amount values (`amount > 0`) | ✅ |
-| **Idempotency** | Prevents duplicate processing via in-memory & PostgreSQL store | ✅ |
-| **Duplicate execution prevention** | 2nd request yields `DUPLICATE` without a 2nd gateway call | ✅ |
-| **PostgreSQL-backed idempotency** | Atomic `INSERT ON CONFLICT DO NOTHING` locks | ✅ |
-| **Retryable failure handling** | Automatic classification of transient gateway errors (`GATEWAY_TIMEOUT`) | ✅ |
-| **Bounded retries** | Caps attempts strictly at 3 with exponential backoff & jitter | ✅ |
-| **Permanent failure stops immediately** | Terminal errors (`CARD_EXPIRED`) halt without retry | ✅ |
-| **Execution outcome** | Returns structured outcome strings (`EXECUTED`, `FAILED_PERMANENT`, etc.) | ✅ |
-| **Attempts tracking** | Accurately counts physical gateway interaction attempts | ✅ |
-| **Recovery tracking** | Distinguishes recovered transactions from total failures | ✅ |
-| **Recovered revenue metrics** | Quantifies total revenue saved and recovery percentage | ✅ |
-| **Python → Go integration** | Python pipeline dispatches commands over HTTP to Go executor | ✅ |
-| **Go → PostgreSQL** | Go engine maintains database transactions and audits | ✅ |
-| **Go → Gateway** | Interacts with simulated bank gateway with realistic failure modes | ✅ |
-| **Full E2E** | Python client to Go daemon to database and gateway verified | ✅ |
-| **Full Go test suite** | 48 unit and integration tests passing in ~4s | ✅ |
-
-> **Key Architectural Boundary:**  
-> `AI recommends ──► Policy authorizes ──► Go executes`  
-> *The machine learning model never gets direct access to money-moving execution.*
 
 ---
 
-## V2 Target Architecture: Event-Driven Recovery Platform
+## Repository Structure
 
-To scale beyond synchronous HTTP to handle **10,000 to 100,000 failed payments/second** during flash sales and banking outages:
-
-```text
-                    PAYMENT FAILURE
-                           │
-                           ▼
-                    ┌─────────────┐
-                    │    Kafka    │
-                    │ recovery.   │
-                    │   events    │
-                    └──────┬──────┘
-                           │
-                 ┌─────────┴─────────┐
-                 ▼                   ▼
-          AI Decision Worker    Risk/Policy
-                 │                   │
-                 └─────────┬─────────┘
-                           ▼
-                    Recovery Queue
-                           │
-                           ▼
-                  ┌────────────────┐
-                  │  Go Executors  │
-                  │    Workers     │
-                  └───────┬────────┘
-                          │
-                    ┌─────┴─────┐
-                    ▼           ▼
-                Gateway       Redis
-                    │           │
-                    └─────┬─────┘
-                          ▼
-                      PostgreSQL
-                          │
-                          ▼
-                    Observability
 ```
-
-### V2 Core Distributed Concepts
-- **Kafka Partitioning**: Partition by `customer_id` / `merchant_id` for in-order processing.
-- **Consumer Groups & At-Least-Once Delivery**: Resilient async worker pools.
-- **Idempotent Consumers**: Deduplication via Redis distributed locks & PostgreSQL constraints.
-- **Concurrent Go Worker Pools**: Tunable worker pools with backpressure and rate limiting.
-- **Circuit Breakers & DLQs**: Protect downstream bank gateways during cascading outages.
-- **Scale Progression**: 10 → 100 → 1,000 → 10,000 → 100,000 payments/sec preserving zero duplicate executions.
+razorpay-recovery-engine/
+├── backend/
+│   ├── api/
+│   │   ├── app.py                      # FastAPI endpoints
+│   │   └── schemas.py                  # Pydantic models
+│   ├── bandit.py                       # Thompson Sampling
+│   ├── bandit_repository.py            # PostgreSQL posteriors
+│   ├── ml_explainer.py                 # SHAP TreeExplainer
+│   ├── crypto_merkle.py                # RFC 6962 Merkle tree
+│   ├── rate_limiter.py                 # Redis Lua token bucket
+│   ├── decision/engine.py              # EV decision engine
+│   ├── policy/engine.py                # Deterministic policy gate
+│   ├── audit_repository.py             # PostgreSQL audit layer
+│   ├── recovery_pipeline.py            # End-to-end pipeline
+│   └── go-executor/
+│       ├── main.go                     # Go service entrypoint
+│       ├── retry.go                    # Bounded retry logic
+│       ├── circuit_breaker.go          # Per-gateway circuit breaker
+│       ├── distributed_rate_limiter.go # Redis Lua token bucket (Go)
+│       └── events/
+│           ├── kafka_dlq_publisher.go  # DLQ producer (acks=all)
+│           └── kafka_dlq_consumer.go   # DLQ consumer
+├── ml/
+│   ├── train.py                        # Model training script
+│   ├── model.pkl                       # Trained RF pipeline
+│   └── data.csv                        # 59K synthetic training rows
+├── frontend/
+│   └── src/
+│       ├── pages/                      # 8 dashboard pages
+│       ├── components/                 # Charts · UI · system cards
+│       └── api/index.ts                # Typed API clients
+├── tests/                              # Python pytest suite
+├── docs/
+├── docker-compose.yml
+└── README.md
+```
 
 ---
 
-## Engineering Reports & Benchmarks
-- [V2.5 Event Idempotency Specification (Dual-Layer Ingestion & Execution)](docs/V2_5_EVENT_IDEMPOTENCY.md)
-- [V2 Architecture Roadmap (Event-Driven Recovery Platform)](docs/V2_ARCHITECTURE_ROADMAP.md)
-- [Benchmark & Performance Tracking (3-Way Multi-Seed Analysis)](docs/BENCHMARKS.md)
-- [2026-09-02 Engineering Day Report (V1 Go Execution Service)](docs/2026-09-02-v1-go-execution-day-report.md)
-- [2026-09-03 Session Report (Post-Execution Audit, Vectorization, 3-Way Experiments, Model Retraining)](docs/2026-09-03-session-report.md)
+## Design Principles
 
+**AI does not equal authority** — The model recommends. The policy gate authorizes.
 
+**Probability does not equal value** — A 90% chance of recovering ₹100 is not always better than a 40% chance of recovering ₹1,000. Expected Value decides.
+
+**Failure is expected** — Duplicate events, network timeouts, and gateway errors are normal distributed-system conditions. The system is designed around them.
+
+**Every decision must be traceable** — Input → Prediction → EV → Policy → Execution → Outcome → Audit → Proof.
+
+**Never fake telemetry** — When real data is unavailable, say `UNAVAILABLE`. When data is simulated, say `SIMULATED`.
+
+---
+
+## Limitations
+
+This is a hackathon system. Important scope boundaries:
+
+- Payment gateway behavior is **locally simulated** — not real bank integrations
+- Controlled experiment results use **synthetic data** — not production traffic
+- Benchmark numbers are **environment-specific**
+- Production deployment requires authentication, authorization, TLS, secret management, compliance controls, and observability infrastructure
+
+These limitations are documented intentionally, not hidden.
+
+---
+
+<div align="center">
+
+**The strongest claim of this project is not that it contains the most components.**
+
+**It is that the components it claims to have are implemented, testable, traceable, and tied to measurable revenue recovery.**
+
+---
+
+*Built for Razorpay AI Buildathon · Track 03: AI Revenue Recovery*
+
+</div>

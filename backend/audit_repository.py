@@ -48,7 +48,10 @@ class AuditRepository:
                     ADD COLUMN IF NOT EXISTS outcome TEXT,
                     ADD COLUMN IF NOT EXISTS attempts INTEGER,
                     ADD COLUMN IF NOT EXISTS recovered BOOLEAN,
-                    ADD COLUMN IF NOT EXISTS retryable BOOLEAN
+                    ADD COLUMN IF NOT EXISTS retryable BOOLEAN,
+                    ADD COLUMN IF NOT EXISTS bank TEXT,
+                    ADD COLUMN IF NOT EXISTS payment_method TEXT,
+                    ADD COLUMN IF NOT EXISTS event_id TEXT
                     """
                 )
                 cursor.execute(
@@ -87,12 +90,16 @@ class AuditRepository:
         attempts,
         recovered,
         retryable,
-        timestamp
+        timestamp,
+        bank,
+        payment_method,
+        event_id
     )
     VALUES (
         %s, %s, %s, %s, %s,
         %s, %s, %s, %s, %s,
-        %s, %s, %s, %s, %s
+        %s, %s, %s, %s, %s,
+        %s, %s, %s
     )
     ON CONFLICT (payment_id)
     DO NOTHING
@@ -113,6 +120,9 @@ class AuditRepository:
         event.get("recovered"),
         event.get("retryable"),
         event["timestamp"],
+        event.get("bank"),
+        event.get("payment_method"),
+        event.get("event_id"),
     ),
 )
     def get_by_payment_id(self, payment_id):
@@ -135,7 +145,10 @@ class AuditRepository:
                         attempts,
                         recovered,
                         retryable,
-                        timestamp
+                        timestamp,
+                        bank,
+                        payment_method,
+                        event_id
                     FROM recovery_audit
                     WHERE payment_id = %s
                     ORDER BY id DESC
@@ -164,7 +177,10 @@ class AuditRepository:
                     "attempts": row[11],
                     "recovered": row[12],
                     "retryable": row[13],
-                    "timestamp": row[14].isoformat(),
+                    "timestamp": row[14].isoformat() if hasattr(row[14], "isoformat") else str(row[14]),
+                    "bank": row[15] if len(row) > 15 else None,
+                    "payment_method": row[16] if len(row) > 16 else None,
+                    "event_id": row[17] if len(row) > 17 else None,
                 }
 
     def count_by_payment_id(self, payment_id):
