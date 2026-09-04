@@ -1,12 +1,39 @@
-import React, { useState } from "react";
+﻿import React, { useState, useEffect } from "react";
+import { recoveryApi, PolicySimulateResponse } from "../../api";
 
 export const PolicySimulationSandbox: React.FC = () => {
-  const [confidenceFloor, setConfidenceFloor] = useState(65);
+  const [confidenceFloor, setConfidenceFloor] = useState(55);
   const [timeoutTolerance, setTimeoutTolerance] = useState(800);
   const [maxRetries, setMaxRetries] = useState(3);
+  const [simulation, setSimulation] = useState<PolicySimulateResponse | null>(null);
+  const [simulating, setSimulating] = useState(false);
 
-  const projectedRecoveryRate = (50 + (confidenceFloor - 50) * 0.15).toFixed(2);
-  const projectedMonthlySavings = Math.round(confidenceFloor * 42000);
+  useEffect(() => {
+    setSimulating(true);
+    recoveryApi
+      .simulatePolicy({
+        recovery_target: confidenceFloor,
+        gateway_trip_rate: 15.0,
+        ev_floor: 50.0,
+        max_hops: maxRetries,
+        auto_recovery_enabled: true,
+      })
+      .then((data) => {
+        if (data) setSimulation(data);
+      })
+      .catch((err) => {
+        console.warn("Using local simulation estimate:", err);
+      })
+      .finally(() => setSimulating(false));
+  }, [confidenceFloor, timeoutTolerance, maxRetries]);
+
+  const projectedRecoveryRate = simulation
+    ? simulation.simulated_recovery_rate.toFixed(2)
+    : (50 + (confidenceFloor - 50) * 0.15).toFixed(2);
+
+  const projectedMonthlySavings = simulation
+    ? Math.round(simulation.simulated_recovered_revenue * 1000000)
+    : Math.round(confidenceFloor * 42000);
 
   return (
     <div className="flex flex-col p-space-base rounded-lg bg-surface-container border border-surface-container-high/60 gap-space-md">
@@ -20,7 +47,7 @@ export const PolicySimulationSandbox: React.FC = () => {
           </p>
         </div>
         <span className="font-label-caps text-label-caps text-secondary uppercase px-space-xs py-0.5 rounded bg-secondary/10 border border-secondary/20">
-          Zero Live Risk Sandbox
+          {simulating ? "SIMULATING ON BACKEND..." : "LIVE FASTAPI SIMULATOR (:8000)"}
         </span>
       </div>
 
@@ -114,12 +141,12 @@ export const PolicySimulationSandbox: React.FC = () => {
           <div>
             <span className="text-outline text-[11px]">ESTIMATED MONTHLY SAVINGS:</span>
             <span className="text-on-surface font-semibold ml-2">
-              ?{(projectedMonthlySavings).toLocaleString("en-IN")}
+              ₹{projectedMonthlySavings.toLocaleString("en-IN")}
             </span>
           </div>
         </div>
 
-        <button className="px-space-sm py-1.5 rounded bg-primary hover:bg-primary-container text-on-primary font-label-caps text-label-caps uppercase transition-colors">
+        <button className="px-space-sm py-1.5 rounded bg-primary hover:bg-primary-container text-on-primary font-label-caps text-label-caps uppercase transition-colors cursor-pointer">
           Apply Policy To Staging
         </button>
       </div>
@@ -128,4 +155,3 @@ export const PolicySimulationSandbox: React.FC = () => {
 };
 
 export default PolicySimulationSandbox;
-

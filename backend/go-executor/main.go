@@ -318,6 +318,14 @@ func main() {
 		"/v1/system/circuit-breakers/reset",
 		circuitBreakersResetHandler(cbRegistry),
 	)
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "healthy", "service": "go-executor"})
+	})
+	mux.HandleFunc("/v1/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": "healthy", "service": "go-executor"})
+	})
 	mux.Handle(
 		"/v1/system/nodes",
 		systemNodesHandler(startTime, metrics),

@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from "react";
-import { recoveryApi } from "../api";
+import { recoveryApi, LiveRecoveryStreamResponse } from "../api";
 import { TransactionRowData } from "../components/recovery/TransactionTable";
 import { StatCard } from "../components/ui/StatCard";
 import { SearchFilterBar } from "../components/ui/SearchFilterBar";
@@ -14,8 +14,19 @@ export const LiveRecovery: React.FC = () => {
   const [selectedStatus, setSelectedStatus] = useState("ALL");
   const [selectedTx, setSelectedTx] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<TransactionRowData[]>([]);
+  const [streamStatus, setStreamStatus] = useState<LiveRecoveryStreamResponse | null>(null);
+  const [injecting, setInjecting] = useState(false);
 
-  useEffect(() => {
+  const fetchStreamData = () => {
+    recoveryApi
+      .getLiveStreamStatus()
+      .then((data) => {
+        if (data) setStreamStatus(data);
+      })
+      .catch((err) => {
+        console.warn("Using stream status fallback:", err);
+      });
+
     recoveryApi
       .getTransactions({
         gateway: selectedGateway !== "ALL" ? selectedGateway : undefined,
@@ -28,7 +39,70 @@ export const LiveRecovery: React.FC = () => {
       .catch((err) => {
         console.warn("Using offline transactions:", err);
       });
+  };
+
+  useEffect(() => {
+    fetchStreamData();
+    const interval = setInterval(fetchStreamData, 5000);
+    return () => clearInterval(interval);
   }, [selectedGateway, selectedStatus, searchQuery]);
+
+  const handleInjectTestEvent = async () => {
+    setInjecting(true);
+    try {
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      const testPaymentId = `pay_live_test_${randomSuffix}`;
+      const amount = Math.floor(1500 + Math.random() * 8500);
+      const decision = await recoveryApi.getDecision({
+        event_id: `evt_${randomSuffix}`,
+        event_type: "PAYMENT_FAILED",
+        payment_id: testPaymentId,
+        customer_id: `cust_${randomSuffix}`,
+        amount: amount,
+        payment_method: "UPI",
+        bank: "HDFC",
+        failure_code: "BANK_TIMEOUT",
+        timestamp: new Date().toISOString(),
+        success_rate: 0.78,
+        recovery_rate: 0.52,
+      });
+
+      const now = new Date();
+      const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now
+        .getMinutes()
+        .toString()
+        .padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}.${now
+        .getMilliseconds()
+        .toString()
+        .padStart(3, "0")}`;
+
+      const newTx: TransactionRowData = {
+        paymentId: testPaymentId,
+        timestamp: timeStr,
+        method: "UPI",
+        bank: "HDFC",
+        amount: amount,
+        failureCode: "BANK_TIMEOUT",
+        expectedValue: decision.expected_value || 350.0,
+        action: (decision.action as any) || "RETRY_NOW",
+        status: "RECOVERED",
+      };
+
+      setTransactions((prev) => [newTx, ...prev]);
+    } catch (err) {
+      console.error("Failed to inject live event:", err);
+    } finally {
+      setInjecting(false);
+    }
+  };
+
+  const kafkaPartitions = streamStatus?.partitions?.map((p) => ({
+    partition: p.partition,
+    currentOffset: p.current_offset,
+    logEndOffset: p.log_end_offset,
+    lag: p.lag,
+    status: (p.status as "NORMAL" | "CONGESTED") || "NORMAL",
+  }));
 
   return (
     <div className="w-full flex flex-col gap-space-lg pb-space-3xl animate-fade-in">
@@ -52,9 +126,15 @@ export const LiveRecovery: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-space-xs">
-          <button className="h-8 px-space-md rounded-lg bg-primary-container hover:bg-primary hover:text-on-primary text-on-surface flex items-center gap-space-xs transition-all cursor-pointer shadow-md active:scale-95">
+          <button
+            onClick={handleInjectTestEvent}
+            disabled={injecting}
+            className="h-8 px-space-md rounded-lg bg-primary-container hover:bg-primary hover:text-on-primary text-on-surface flex items-center gap-space-xs transition-all cursor-pointer shadow-md active:scale-95 disabled:opacity-50"
+          >
             <span className="material-symbols-outlined text-[16px]">bolt</span>
-            <span className="font-badge-label text-badge-label font-semibold">Inject Test Event</span>
+            <span className="font-badge-label text-badge-label font-semibold">
+              {injecting ? "Injecting & Routing..." : "Inject Test Event"}
+            </span>
           </button>
         </div>
       </div>
@@ -63,7 +143,7 @@ export const LiveRecovery: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-sm">
         <StatCard
           title="Streaming Rate"
-          value="1,840/s"
+          value={streamStatus ? streamStatus.streaming_rate : "1,840/s"}
           subtitle="Events/sec ingested"
           delta="Normal Flow"
           deltaType="positive"
@@ -71,7 +151,7 @@ export const LiveRecovery: React.FC = () => {
         />
         <StatCard
           title="Instant Recovery (p95)"
-          value="54.26%"
+          value={streamStatus ? streamStatus.instant_recovery_p95 : "54.26%"}
           subtitle="Automated retry success"
           delta="+6.61% vs Rule"
           deltaType="positive"
@@ -79,16 +159,16 @@ export const LiveRecovery: React.FC = () => {
         />
         <StatCard
           title="Decision P99 Latency"
-          value="2.14ms"
+          value={streamStatus ? streamStatus.decision_p99_latency_ms : "2.14ms"}
           subtitle="Go -> Python HTTP SLA"
           delta="< 10ms target"
           deltaType="positive"
           icon="timer"
         />
         <StatCard
-          title="Active Backoff Queue"
-          value="43 txns"
-          subtitle="Awaiting exponential timer"
+          title="Active Kafka Lag"
+          value={streamStatus ? streamStatus.kafka_lag_msgs : "11 msgs"}
+          subtitle="Across 4 active partitions"
           delta="Dynamic Jitter"
           deltaType="neutral"
           icon="schedule"
@@ -96,10 +176,12 @@ export const LiveRecovery: React.FC = () => {
       </div>
 
       {/* Trajectory Chart */}
-      <TrendAreaChart />
+      <TrendAreaChart
+        recoveredRate={streamStatus?.instant_recovery_p95 ? `${streamStatus.instant_recovery_p95} Recovered` : undefined}
+      />
 
       {/* Kafka Partition Lag Monitor */}
-      <KafkaLagMonitor />
+      <KafkaLagMonitor partitions={kafkaPartitions} />
 
       {/* Search & Filter Controls */}
       <SearchFilterBar
@@ -112,7 +194,10 @@ export const LiveRecovery: React.FC = () => {
       />
 
       {/* Real-time Ledger */}
-      <TransactionTable transactions={transactions.length > 0 ? transactions : undefined} onInspect={(id) => setSelectedTx(id)} />
+      <TransactionTable
+        transactions={transactions.length > 0 ? transactions : undefined}
+        onInspect={(id) => setSelectedTx(id)}
+      />
 
       {/* Decision Lineage Drawer */}
       <DecisionLineageDrawer
@@ -125,4 +210,3 @@ export const LiveRecovery: React.FC = () => {
 };
 
 export default LiveRecovery;
-

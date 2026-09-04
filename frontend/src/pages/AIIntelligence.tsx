@@ -1,15 +1,43 @@
 ﻿import React, { useState, useEffect } from "react";
-import { recoveryApi, AIModelHealthResponse } from "../api";
+import { recoveryApi, AIModelHealthResponse, FeatureImportanceItem } from "../api";
 import { StatCard } from "../components/ui/StatCard";
 import { CalibrationCurve } from "../components/charts/CalibrationCurve";
 import { ConfidenceBar } from "../components/ui/ConfidenceBar";
 
 export const AIIntelligence: React.FC = () => {
   const [modelHealth, setModelHealth] = useState<AIModelHealthResponse | null>(null);
+  const [evaluating, setEvaluating] = useState(false);
+
+  const fetchModelHealth = () => {
+    setEvaluating(true);
+    recoveryApi
+      .getAIModelHealth()
+      .then((data) => {
+        if (data) setModelHealth(data);
+      })
+      .catch((err) => {
+        console.warn("Using offline AI model health:", err);
+      })
+      .finally(() => setEvaluating(false));
+  };
 
   useEffect(() => {
-    recoveryApi.getAIModelHealth().then(setModelHealth).catch(console.warn);
+    fetchModelHealth();
   }, []);
+
+  const defaultFeatures: FeatureImportanceItem[] = [
+    { feature: "Historical Bank Success Rate", importance: 0.384 },
+    { feature: "Payment Method (UPI vs Card)", importance: 0.242 },
+    { feature: "Failure Reason Category (Transient)", importance: 0.198 },
+    { feature: "Peak Hourly Congestion Index", importance: 0.116 },
+    { feature: "Customer Recency Factor", importance: 0.06 },
+  ];
+
+  const features =
+    modelHealth?.feature_importances && modelHealth.feature_importances.length > 0
+      ? modelHealth.feature_importances
+      : defaultFeatures;
+
   return (
     <div className="w-full flex flex-col gap-space-lg pb-space-3xl animate-fade-in">
       {/* Header */}
@@ -32,8 +60,12 @@ export const AIIntelligence: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-space-xs">
-          <button className="h-8 px-space-md rounded bg-primary text-on-primary font-badge-label text-badge-label font-semibold hover:bg-primary-container transition-colors shadow-sm">
-            Trigger Retraining Pipeline
+          <button
+            onClick={fetchModelHealth}
+            disabled={evaluating}
+            className="h-8 px-space-md rounded bg-primary text-on-primary font-badge-label text-badge-label font-semibold hover:bg-primary-container transition-colors shadow-sm cursor-pointer disabled:opacity-50"
+          >
+            {evaluating ? "Evaluating..." : "Evaluate Active Model"}
           </button>
         </div>
       </div>
@@ -42,32 +74,32 @@ export const AIIntelligence: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-sm">
         <StatCard
           title="Brier Calibration Score"
-          value="0.084"
-          subtitle="Target: < 0.100"
+          value={modelHealth ? modelHealth.brier_score.toFixed(3) : "0.084"}
+          subtitle={`Target: < 0.100 (ECE: ${(modelHealth?.ece ?? 0.012).toFixed(3)})`}
           delta="Well Calibrated"
           deltaType="positive"
           icon="tune"
         />
         <StatCard
           title="Inference Latency (P95)"
-          value="1.84ms"
-          subtitle="FastAPI / Torch C-Lib"
+          value={modelHealth ? `${modelHealth.latency.p95_ms.toFixed(2)}ms` : "1.84ms"}
+          subtitle="FastAPI / ML Pipeline"
           delta="< 5ms SLA"
           deltaType="positive"
           icon="bolt"
         />
         <StatCard
           title="Population Stability Index"
-          value="0.038"
+          value={modelHealth ? modelHealth.concept_drift_psi.toFixed(3) : "0.038"}
           subtitle="Drift threshold: 0.10"
           delta="No Concept Drift"
           deltaType="positive"
           icon="waves"
         />
         <StatCard
-          title="Model Version"
-          value="v2.4.1"
-          subtitle="Updated 14h ago"
+          title="Model Architecture"
+          value={modelHealth ? modelHealth.model_name : "RandomForestClassifier"}
+          subtitle={`ROC-AUC: ${((modelHealth?.roc_auc ?? 0.878) * 100).toFixed(1)}%`}
           delta="Active Champion"
           deltaType="neutral"
           icon="verified"
@@ -75,7 +107,10 @@ export const AIIntelligence: React.FC = () => {
       </div>
 
       {/* Model Calibration Curve */}
-      <CalibrationCurve />
+      <CalibrationCurve
+        brierScore={modelHealth?.brier_score}
+        expectedCalibrationError={modelHealth?.ece}
+      />
 
       {/* Feature Importance & Drift Matrix */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-space-lg">
@@ -88,41 +123,17 @@ export const AIIntelligence: React.FC = () => {
           </p>
 
           <div className="space-y-space-sm mt-space-xs font-mono-code text-[12px]">
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-on-surface">Historical Bank Success Rate</span>
-                <span className="text-secondary font-medium">38.4%</span>
+            {features.map((item) => (
+              <div key={item.feature}>
+                <div className="flex justify-between mb-1">
+                  <span className="text-on-surface">{item.feature}</span>
+                  <span className="text-secondary font-medium">
+                    {(item.importance * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <ConfidenceBar value={item.importance} showLabel={false} />
               </div>
-              <ConfidenceBar value={0.384} showLabel={false} />
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-on-surface">Payment Method (UPI vs Card)</span>
-                <span className="text-secondary font-medium">24.2%</span>
-              </div>
-              <ConfidenceBar value={0.242} showLabel={false} />
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-on-surface">Failure Reason Category (Transient)</span>
-                <span className="text-secondary font-medium">19.8%</span>
-              </div>
-              <ConfidenceBar value={0.198} showLabel={false} />
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-on-surface">Peak Hourly Congestion Index</span>
-                <span className="text-secondary font-medium">11.6%</span>
-              </div>
-              <ConfidenceBar value={0.116} showLabel={false} />
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-on-surface">Customer Recency Factor</span>
-                <span className="text-secondary font-medium">6.0%</span>
-              </div>
-              <ConfidenceBar value={0.06} showLabel={false} />
-            </div>
+            ))}
           </div>
         </div>
 
@@ -137,24 +148,31 @@ export const AIIntelligence: React.FC = () => {
           <div className="p-space-sm rounded bg-surface-container-low border border-surface-container-high font-mono-code text-[11px] space-y-2 mt-space-xs">
             <div className="flex justify-between items-center">
               <div>
-                <span className="text-on-surface font-medium">HDFC Bank Latency Profile</span>
+                <span className="text-on-surface font-medium">Historical Bank Success Rate</span>
                 <div className="text-outline text-[10px]">p-value = 0.42 (Stable)</div>
               </div>
               <span className="text-secondary font-semibold">STABLE</span>
             </div>
             <div className="flex justify-between items-center border-t border-surface-container-high/40 pt-1.5">
               <div>
-                <span className="text-on-surface font-medium">UPI 504 Timeout Frequency</span>
+                <span className="text-on-surface font-medium">UPI vs NetBanking Route Latency</span>
                 <div className="text-outline text-[10px]">p-value = 0.38 (Normal)</div>
               </div>
               <span className="text-secondary font-semibold">STABLE</span>
             </div>
             <div className="flex justify-between items-center border-t border-surface-container-high/40 pt-1.5">
               <div>
-                <span className="text-on-surface font-medium">SBI NetBanking Volume Ratio</span>
-                <div className="text-outline text-[10px]">p-value = 0.14 (Minor shift)</div>
+                <span className="text-on-surface font-medium">Transient Failure Propensity</span>
+                <div className="text-outline text-[10px]">p-value = 0.51 (Calibrated)</div>
               </div>
-              <span className="text-tertiary font-semibold">WATCHING</span>
+              <span className="text-secondary font-semibold">STABLE</span>
+            </div>
+            <div className="flex justify-between items-center border-t border-surface-container-high/40 pt-1.5">
+              <div>
+                <span className="text-on-surface font-medium">Ticket Size Distribution (Amount)</span>
+                <div className="text-outline text-[10px]">p-value = 0.47 (Consistent)</div>
+              </div>
+              <span className="text-secondary font-semibold">STABLE</span>
             </div>
           </div>
         </div>
@@ -164,4 +182,3 @@ export const AIIntelligence: React.FC = () => {
 };
 
 export default AIIntelligence;
-

@@ -82,10 +82,21 @@ export interface OverviewSummaryResponse {
   recent_transactions: TransactionItem[];
 }
 
+export interface StateStepItem {
+  step: string;
+  time: string;
+  status: string;
+  description: string;
+  color: string;
+}
+
 export interface AuditDetailResponse {
+  event_id?: string;
   payment_id: string;
   customer_id: string;
   amount: number;
+  payment_method: string;
+  bank: string;
   failure_code: string;
   probabilities: Record<string, number>;
   recommended_action: string;
@@ -100,6 +111,8 @@ export interface AuditDetailResponse {
   timestamp: string;
   merkle_leaf_hash?: string;
   merkle_proof?: string[];
+  state_steps?: StateStepItem[];
+  raw_payload?: Record<string, unknown>;
 }
 
 export interface MABArm {
@@ -117,9 +130,12 @@ export interface MABExperimentResponse {
   experiment_id: string;
   status: string;
   total_trials: number;
-  arms: MABArm[];
+  active_arms_count: number;
+  exploration_allocation: number;
+  ai_lift_vs_rule: number;
   statistical_p_value: number;
   winning_arm: string;
+  arms: MABArm[];
 }
 
 export interface CalibrationPoint {
@@ -142,11 +158,15 @@ export interface FeatureImportanceItem {
 export interface AIModelHealthResponse {
   model_name: string;
   accuracy: number;
+  precision: number;
+  recall: number;
+  f1_score: number;
   roc_auc: number;
   cv_roc_auc_mean: number;
   cv_roc_auc_std: number;
   brier_score: number;
   ece: number;
+  concept_drift_psi: number;
   calibration_curve: CalibrationPoint[];
   latency: LatencyQuantiles;
   feature_importances: FeatureImportanceItem[];
@@ -154,10 +174,12 @@ export interface AIModelHealthResponse {
 
 export interface PolicyItem {
   id: string;
+  tier?: string;
+  priority?: string;
   name: string;
-  tier: string;
+  description: string;
   trigger_condition: string;
-  override_action: string;
+  action_override: string;
   triggers_today: number;
   enabled: boolean;
 }
@@ -192,6 +214,8 @@ export interface AuditLedgerResponse {
   total_records: number;
   merkle_root: string;
   tree_height: number;
+  tamper_proof: boolean;
+  active_wal_replicas: number;
   entries: AuditLedgerEntry[];
 }
 
@@ -201,6 +225,24 @@ export interface MerkleProofResponse {
   merkle_root: string;
   proof_hashes: string[];
   verified: boolean;
+}
+
+export interface KafkaPartitionLag {
+  partition: number;
+  topic: string;
+  current_offset: number;
+  log_end_offset: number;
+  lag: number;
+  status: string;
+}
+
+export interface LiveRecoveryStreamResponse {
+  streaming_rate: string;
+  instant_recovery_p95: string;
+  decision_p99_latency_ms: string;
+  kafka_lag_msgs: string;
+  partitions: KafkaPartitionLag[];
+  trend_data: TrajectoryPoint[];
 }
 
 export interface NodeStatus {
@@ -214,6 +256,23 @@ export interface NodeStatus {
   active_workers: number;
   queue_depth: number;
   throughput_ops_sec: number;
+}
+
+export interface LatencyBucket {
+  bucket: string;
+  count: number;
+  percentage: number;
+}
+
+export interface SystemHealthResponse {
+  executor_throughput: string;
+  kafka_ingestion_lag: string;
+  p99_execution_time: string;
+  postgres_wal_sync: string;
+  node_status: NodeStatus;
+  circuit_breakers: CircuitBreakerStatus[];
+  kafka_partitions: KafkaPartitionLag[];
+  latency_histogram: LatencyBucket[];
 }
 
 const AI_API_URL = import.meta.env.VITE_AI_URL || 'http://localhost:8000';
@@ -280,6 +339,18 @@ export const recoveryApi = {
     return res.json();
   },
 
+  async getLiveStreamStatus(): Promise<LiveRecoveryStreamResponse> {
+    const res = await fetch(`${AI_API_URL}/v1/recovery/stream-status`);
+    if (!res.ok) throw new Error(`Stream status API error: ${res.status}`);
+    return res.json();
+  },
+
+  async getSystemHealth(): Promise<SystemHealthResponse> {
+    const res = await fetch(`${AI_API_URL}/v1/system/health`);
+    if (!res.ok) throw new Error(`System health API error: ${res.status}`);
+    return res.json();
+  },
+
   async getMABExperiment(): Promise<MABExperimentResponse> {
     const res = await fetch(`${AI_API_URL}/v1/experiments/mab`);
     if (!res.ok) throw new Error(`MAB API error: ${res.status}`);
@@ -343,7 +414,6 @@ export const recoveryApi = {
       if (!res.ok) throw new Error(`Circuit breakers API error: ${res.status}`);
       return res.json();
     } catch {
-      // Fallback if Go executor is offline
       const aiRes = await fetch(`${AI_API_URL}/v1/analytics/overview-summary`).catch(() => null);
       if (aiRes && aiRes.ok) {
         const data: OverviewSummaryResponse = await aiRes.json();

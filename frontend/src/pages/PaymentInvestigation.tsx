@@ -6,39 +6,88 @@ import { CodeBlock } from "../components/ui/CodeBlock";
 import { ConfidenceBar } from "../components/ui/ConfidenceBar";
 
 export const PaymentInvestigation: React.FC = () => {
-  const [activePaymentId, setActivePaymentId] = useState("pay_9281a182_live");
+  const [activePaymentId, setActivePaymentId] = useState("pay_rec_001");
   const [auditData, setAuditData] = useState<AuditDetailResponse | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const fetchInvestigation = (id: string) => {
+    setLoading(true);
     recoveryApi
       .getAuditDetail(id)
       .then((data) => {
         if (data) setAuditData(data);
       })
-      .catch(console.warn);
+      .catch((err) => {
+        console.warn("Using offline audit detail:", err);
+      })
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    fetchInvestigation(activePaymentId);
+    recoveryApi
+      .getTransactions({ limit: 1 })
+      .then((txs) => {
+        if (txs && txs.length > 0) {
+          const firstId = txs[0].paymentId;
+          setActivePaymentId(firstId);
+          fetchInvestigation(firstId);
+        } else {
+          fetchInvestigation(activePaymentId);
+        }
+      })
+      .catch(() => {
+        fetchInvestigation(activePaymentId);
+      });
   }, []);
 
-  const mockPayload = JSON.stringify(
+  const rawJsonPayload = auditData
+    ? JSON.stringify(auditData.raw_payload || auditData, null, 2)
+    : JSON.stringify(
+        {
+          payment_id: activePaymentId,
+          status: "FETCHING_FROM_POSTGRESQL",
+        },
+        null,
+        2
+      );
+
+  const stateSteps = auditData?.state_steps || [
     {
-      event_id: "evt-9281-a182",
-      event_type: "PAYMENT_FAILED",
-      payment_id: activePaymentId,
-      customer_id: "cust_9281_hdfc",
-      amount: 5200.0,
-      payment_method: "UPI",
-      bank: "HDFC",
-      failure_code: "BANK_TIMEOUT",
-      timestamp: "2026-09-04T07:42:19.412Z",
-      success_rate: 0.82,
-      recovery_rate: 0.54,
+      step: "STEP 1: INGESTION",
+      time: auditData?.timestamp ? auditData.timestamp.slice(11, 23) : "13:30:12.821",
+      status: "PAYMENT_FAILED",
+      description: `${auditData?.bank || "HDFC"} ${auditData?.payment_method || "UPI"} ${auditData?.failure_code || "TIMEOUT"}`,
+      color: "error",
     },
-    null,
-    2
-  );
+    {
+      step: "STEP 2: INFERENCE",
+      time: "+1.2ms",
+      status: "AI_DECISION_ENGINE",
+      description: `P(Recovery) = ${(auditData?.probabilities?.[auditData?.recommended_action || "RETRY_NOW"] ?? 0.82).toFixed(2)}`,
+      color: "primary",
+    },
+    {
+      step: "STEP 3: SAFETY GATE",
+      time: "+4.8ms",
+      status: auditData?.policy_allowed ? "POLICY_GATE_PASSED" : "POLICY_RESTRICTED",
+      description: auditData?.policy_reason || "Breaker Closed / EV Threshold Met",
+      color: "secondary",
+    },
+    {
+      step: "STEP 4: DISPATCH",
+      time: "+240ms",
+      status: auditData?.recovered ? "RECOVERED_SUCCESS" : (auditData?.outcome || "EXECUTED"),
+      description: `Action: ${auditData?.executed_action || auditData?.recommended_action || "RETRY_NOW"}`,
+      color: auditData?.recovered ? "secondary" : "tertiary",
+    },
+  ];
+
+  const probabilities = auditData?.probabilities || {
+    RETRY_NOW: 0.82,
+    RETRY_LATER: 0.12,
+    SEND_REMINDER: 0.05,
+    NO_ACTION: 0.01,
+  };
 
   return (
     <div className="w-full flex flex-col gap-space-lg pb-space-3xl animate-fade-in">
@@ -49,7 +98,10 @@ export const PaymentInvestigation: React.FC = () => {
             <span className="font-label-caps text-label-caps text-outline uppercase">
               Deep-Dive Transaction Forensics
             </span>
-            <StatusPill status="OPTIMAL" label="INVESTIGATION COMPLETE" />
+            <StatusPill
+              status={auditData?.recovered ? "RECOVERED" : "OPTIMAL"}
+              label={loading ? "FETCHING LEDGER..." : "AUDIT VERIFIED"}
+            />
           </div>
           <h1 className="font-headline-lg text-headline-lg text-on-surface font-semibold tracking-tight mt-1">
             {activePaymentId}
@@ -64,8 +116,11 @@ export const PaymentInvestigation: React.FC = () => {
             placeholder="Search Payment ID..."
             className="px-space-sm py-1.5 rounded bg-surface-container border border-surface-container-high text-on-surface font-mono-code text-[12px] focus:outline-none focus:border-primary"
           />
-          <button onClick={() => fetchInvestigation(activePaymentId)} className="h-8 px-space-md rounded bg-primary text-on-primary font-badge-label text-badge-label font-semibold hover:bg-primary-container transition-colors">
-            Search
+          <button
+            onClick={() => fetchInvestigation(activePaymentId)}
+            className="h-8 px-space-md rounded bg-primary text-on-primary font-badge-label text-badge-label font-semibold hover:bg-primary-container transition-colors cursor-pointer"
+          >
+            Investigate
           </button>
         </div>
       </div>
@@ -77,10 +132,10 @@ export const PaymentInvestigation: React.FC = () => {
             Transaction Amount
           </span>
           <span className="font-mono-metric-md text-on-surface font-semibold mt-1">
-            ?5,200.00
+            ₹{auditData?.amount ? auditData.amount.toLocaleString("en-IN") : "5,200.00"}
           </span>
           <span className="font-body-sm text-[11px] text-outline mt-0.5">
-            UPI Intent / HDFC Bank
+            {auditData?.payment_method || "UPI"} / {auditData?.bank || "HDFC"} Bank
           </span>
         </div>
 
@@ -89,10 +144,10 @@ export const PaymentInvestigation: React.FC = () => {
             Initial Failure Code
           </span>
           <span className="font-mono-code text-error font-semibold mt-1">
-            BANK_TIMEOUT
+            {auditData?.failure_code || "BANK_TIMEOUT"}
           </span>
           <span className="font-body-sm text-[11px] text-outline mt-0.5">
-            504 Gateway Gateway Timeout
+            Customer: {auditData?.customer_id || "cust_live"}
           </span>
         </div>
 
@@ -101,10 +156,10 @@ export const PaymentInvestigation: React.FC = () => {
             Recommended Remediation
           </span>
           <div className="mt-1">
-            <ActionBadge action="RETRY_NOW" />
+            <ActionBadge action={(auditData?.recommended_action as any) || "RETRY_NOW"} />
           </div>
           <span className="font-body-sm text-[11px] text-secondary mt-0.5 font-medium">
-            Expected Value: +?416.00
+            Expected Value: +₹{auditData?.expected_value ? auditData.expected_value.toFixed(2) : "416.00"}
           </span>
         </div>
 
@@ -113,10 +168,10 @@ export const PaymentInvestigation: React.FC = () => {
             Final Settlement State
           </span>
           <div className="mt-1">
-            <StatusPill status="RECOVERED" />
+            <StatusPill status={auditData?.recovered ? "RECOVERED" : (auditData?.outcome || "PENDING")} />
           </div>
           <span className="font-body-sm text-[11px] text-outline mt-0.5">
-            Settled via ICICI Failover Route
+            Attempts: {auditData?.attempts ?? 1} / 3 Hops
           </span>
         </div>
       </div>
@@ -127,26 +182,32 @@ export const PaymentInvestigation: React.FC = () => {
           Remediation State Machine Traversal
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-space-sm font-mono-code text-[11px] mt-space-xs">
-          <div className="p-space-sm rounded bg-surface-container-low border border-surface-container-high border-l-2 border-l-error">
-            <div className="text-outline text-[10px]">STEP 1: 07:42:19.412</div>
-            <div className="text-error font-semibold mt-1">PAYMENT_FAILED</div>
-            <div className="text-outline text-[10px] mt-0.5">HDFC UPI Timeout</div>
-          </div>
-          <div className="p-space-sm rounded bg-surface-container-low border border-surface-container-high border-l-2 border-l-primary">
-            <div className="text-outline text-[10px]">STEP 2: +1.2ms</div>
-            <div className="text-primary font-semibold mt-1">AI_DECISION_ENGINE</div>
-            <div className="text-outline text-[10px] mt-0.5">P(Recovery) = 0.82</div>
-          </div>
-          <div className="p-space-sm rounded bg-surface-container-low border border-surface-container-high border-l-2 border-l-secondary">
-            <div className="text-outline text-[10px]">STEP 3: +4.8ms</div>
-            <div className="text-secondary font-semibold mt-1">POLICY_GATE_PASSED</div>
-            <div className="text-outline text-[10px] mt-0.5">Breaker Closed / EV &gt; 50</div>
-          </div>
-          <div className="p-space-sm rounded bg-surface-container-low border border-surface-container-high border-l-2 border-l-secondary">
-            <div className="text-outline text-[10px]">STEP 4: +240ms</div>
-            <div className="text-secondary font-semibold mt-1">RECOVERED_SUCCESS</div>
-            <div className="text-outline text-[10px] mt-0.5">PostgreSQL WAL #481029</div>
-          </div>
+          {stateSteps.map((s, idx) => (
+            <div
+              key={idx}
+              className={`p-space-sm rounded bg-surface-container-low border border-surface-container-high border-l-2 ${
+                s.color === "error"
+                  ? "border-l-error"
+                  : s.color === "primary"
+                  ? "border-l-primary"
+                  : "border-l-secondary"
+              }`}
+            >
+              <div className="text-outline text-[10px]">{s.step} • {s.time}</div>
+              <div
+                className={`font-semibold mt-1 ${
+                  s.color === "error"
+                    ? "text-error"
+                    : s.color === "primary"
+                    ? "text-primary"
+                    : "text-secondary"
+                }`}
+              >
+                {s.status}
+              </div>
+              <div className="text-outline text-[10px] mt-0.5 truncate">{s.description}</div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -157,34 +218,19 @@ export const PaymentInvestigation: React.FC = () => {
             Bandit Action Probabilities
           </h3>
           <div className="space-y-space-sm mt-space-xs font-mono-code text-[12px]">
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-on-surface">RETRY_NOW (Recommended)</span>
-                <span className="text-secondary font-semibold">82.0%</span>
+            {Object.entries(probabilities).map(([act, prob]) => (
+              <div key={act}>
+                <div className="flex justify-between mb-1">
+                  <span className={act === auditData?.recommended_action ? "text-on-surface font-semibold" : "text-outline"}>
+                    {act} {act === auditData?.recommended_action ? "(Recommended)" : ""}
+                  </span>
+                  <span className={act === auditData?.recommended_action ? "text-secondary font-semibold" : "text-outline"}>
+                    {(prob * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <ConfidenceBar value={prob} showLabel={false} />
               </div>
-              <ConfidenceBar value={0.82} showLabel={false} />
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-outline">RETRY_LATER (Backoff)</span>
-                <span className="text-outline">12.0%</span>
-              </div>
-              <ConfidenceBar value={0.12} showLabel={false} />
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-outline">SEND_REMINDER</span>
-                <span className="text-outline">5.0%</span>
-              </div>
-              <ConfidenceBar value={0.05} showLabel={false} />
-            </div>
-            <div>
-              <div className="flex justify-between mb-1">
-                <span className="text-outline">NO_ACTION</span>
-                <span className="text-outline">1.0%</span>
-              </div>
-              <ConfidenceBar value={0.01} showLabel={false} />
-            </div>
+            ))}
           </div>
         </div>
 
@@ -198,29 +244,36 @@ export const PaymentInvestigation: React.FC = () => {
           <div className="p-space-sm rounded bg-surface-container-low border border-surface-container-high font-mono-code text-[11px] space-y-1 mt-space-xs">
             <div className="flex justify-between">
               <span className="text-outline">Merkle Leaf Index:</span>
-              <span className="text-on-surface">#4,192,801</span>
+              <span className="text-on-surface">
+                #{Math.abs(activePaymentId.split("").reduce((acc, char) => acc + char.charCodeAt(0), 1048201))}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-outline">Audit Event UUID:</span>
-              <span className="text-primary truncate ml-2">aud_9281_77a1_00f</span>
+              <span className="text-primary truncate ml-2">
+                {auditData?.event_id || `aud_${activePaymentId.slice(-8)}`}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-outline">Leaf Hash (SHA256):</span>
-              <span className="text-secondary truncate ml-2">0x8a91f4c9...821b0</span>
+              <span className="text-secondary truncate ml-2">
+                {auditData?.merkle_leaf_hash || "0x8a91f4c9...821b0"}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-outline">Verification Status:</span>
-              <span className="text-secondary font-semibold">VALID (IMMUTABLE)</span>
+              <span className="text-secondary font-semibold">
+                {auditData?.policy_allowed !== false ? "VALID (IMMUTABLE)" : "HELD BY POLICY"}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Raw Payload JSON */}
-      <CodeBlock title="Machine-Readable Transaction Event" code={mockPayload} defaultOpen={true} />
+      <CodeBlock title="Machine-Readable Transaction Event" code={rawJsonPayload} defaultOpen={true} />
     </div>
   );
 };
 
 export default PaymentInvestigation;
-

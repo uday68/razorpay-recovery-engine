@@ -66,10 +66,21 @@ class OverviewSummaryResponse(BaseModel):
     recent_transactions: List[TransactionItem]
 
 
+class StateStepItem(BaseModel):
+    step: str
+    time: str
+    status: str
+    description: str
+    color: str
+
+
 class AuditDetailResponse(BaseModel):
+    event_id: Optional[str] = None
     payment_id: str
     customer_id: str
     amount: float
+    payment_method: str
+    bank: str
     failure_code: str
     probabilities: Dict[str, float]
     recommended_action: str
@@ -84,6 +95,8 @@ class AuditDetailResponse(BaseModel):
     timestamp: str
     merkle_leaf_hash: Optional[str] = None
     merkle_proof: Optional[List[str]] = None
+    state_steps: Optional[List[StateStepItem]] = None
+    raw_payload: Optional[Dict[str, Any]] = None
 
 
 class MABArm(BaseModel):
@@ -101,9 +114,12 @@ class MABExperimentResponse(BaseModel):
     experiment_id: str
     status: str
     total_trials: int
-    arms: List[MABArm]
+    active_arms_count: int
+    exploration_allocation: float
+    ai_lift_vs_rule: float
     statistical_p_value: float
     winning_arm: str
+    arms: List[MABArm]
 
 
 class CalibrationPoint(BaseModel):
@@ -126,11 +142,15 @@ class FeatureImportanceItem(BaseModel):
 class AIModelHealthResponse(BaseModel):
     model_name: str
     accuracy: float
+    precision: float
+    recall: float
+    f1_score: float
     roc_auc: float
     cv_roc_auc_mean: float
     cv_roc_auc_std: float
     brier_score: float
     ece: float
+    concept_drift_psi: float
     calibration_curve: List[CalibrationPoint]
     latency: LatencyQuantiles
     feature_importances: List[FeatureImportanceItem]
@@ -138,10 +158,12 @@ class AIModelHealthResponse(BaseModel):
 
 class PolicyItem(BaseModel):
     id: str
+    tier: str = "P0"
+    priority: str = "P0 CRITICAL"
     name: str
-    tier: str
+    description: str
     trigger_condition: str
-    override_action: str
+    action_override: str
     triggers_today: int
     enabled: bool
 
@@ -176,6 +198,8 @@ class AuditLedgerResponse(BaseModel):
     total_records: int
     merkle_root: str
     tree_height: int
+    tamper_proof: bool
+    active_wal_replicas: int
     entries: List[AuditLedgerEntry]
 
 
@@ -185,3 +209,51 @@ class MerkleProofResponse(BaseModel):
     merkle_root: str
     proof_hashes: List[str]
     verified: bool
+
+
+class KafkaPartitionLag(BaseModel):
+    partition: int
+    topic: str
+    current_offset: int
+    log_end_offset: int
+    lag: int
+    status: str
+
+
+class LiveRecoveryStreamResponse(BaseModel):
+    streaming_rate: str
+    instant_recovery_p95: str
+    decision_p99_latency_ms: str
+    kafka_lag_msgs: str
+    partitions: List[KafkaPartitionLag]
+    trend_data: List[TrajectoryPoint]
+
+
+class NodeStatus(BaseModel):
+    node_id: str
+    uptime_seconds: float
+    goroutines: int
+    memory_alloc_mb: float
+    memory_sys_mb: float
+    num_gc: int
+    status: str
+    active_workers: int
+    queue_depth: int
+    throughput_ops_sec: float
+
+
+class LatencyBucket(BaseModel):
+    bucket: str
+    count: int
+    percentage: float
+
+
+class SystemHealthResponse(BaseModel):
+    executor_throughput: str
+    kafka_ingestion_lag: str
+    p99_execution_time: str
+    postgres_wal_sync: str
+    node_status: NodeStatus
+    circuit_breakers: List[CircuitBreakerOverview]
+    kafka_partitions: List[KafkaPartitionLag]
+    latency_histogram: List[LatencyBucket]

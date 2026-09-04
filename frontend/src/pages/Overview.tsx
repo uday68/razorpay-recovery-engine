@@ -1,9 +1,9 @@
 ﻿import React, { useState, useEffect } from "react";
-import { recoveryApi, mapTransactionItemToRow } from "../api";
+import { recoveryApi, mapTransactionItemToRow, CircuitBreakerStatus } from "../api";
 import { StatCard } from "../components/ui/StatCard";
 import { ToastContainer, ToastMessage } from "../components/ui/Toast";
 import { TrendAreaChart } from "../components/charts/TrendAreaChart";
-import { CircuitBreakerCard } from "../components/system/CircuitBreakerCard";
+import { CircuitBreakerCard, GatewayBreaker } from "../components/system/CircuitBreakerCard";
 import { TransactionTable, TransactionRowData } from "../components/recovery/TransactionTable";
 import { DecisionLineageDrawer } from "../components/recovery/DecisionLineageDrawer";
 import {
@@ -79,9 +79,12 @@ export const Overview: React.FC = () => {
   // Telemetry metrics state
   const [atRiskRevenue, setAtRiskRevenue] = useState(15.14);
   const [recoveredRevenue, setRecoveredRevenue] = useState(8.26);
+  const [recoveryRate, setRecoveryRate] = useState(54.26);
+  const [aiLift, setAiLift] = useState(6.61);
   const [activeInFlight, setActiveInFlight] = useState(127);
+  const [circuitBreakers, setCircuitBreakers] = useState<CircuitBreakerStatus[]>([]);
 
-  useEffect(() => {
+  const fetchOverview = () => {
     recoveryApi
       .getOverviewSummary()
       .then((data) => {
@@ -89,6 +92,9 @@ export const Overview: React.FC = () => {
           setAtRiskRevenue(data.at_risk_revenue);
           setRecoveredRevenue(data.recovered_revenue);
           setActiveInFlight(data.active_in_flight);
+          setRecoveryRate(data.recovery_rate);
+          setAiLift(data.ai_lift);
+          if (data.circuit_breakers) setCircuitBreakers(data.circuit_breakers);
           if (data.recent_transactions && data.recent_transactions.length > 0) {
             setTransactions(data.recent_transactions.map(mapTransactionItemToRow));
           }
@@ -97,6 +103,10 @@ export const Overview: React.FC = () => {
       .catch((err) => {
         console.warn("Using offline summary telemetry:", err);
       });
+  };
+
+  useEffect(() => {
+    fetchOverview();
   }, []);
 
   // Policy Thresholds configuration
@@ -236,6 +246,71 @@ export const Overview: React.FC = () => {
     });
   };
 
+  const handleToggleBreaker = async (name: string, newState: "CLOSED" | "OPEN") => {
+    try {
+      const gatewayKey = name.split(" ")[0].toUpperCase();
+      if (newState === "OPEN") {
+        await recoveryApi.tripCircuitBreaker(gatewayKey);
+      } else {
+        await recoveryApi.resetCircuitBreaker(gatewayKey);
+      }
+      addToast({
+        id: Date.now().toString(),
+        type: newState === "CLOSED" ? "success" : "warning",
+        title: `Circuit Breaker Altered: ${name}`,
+        description: `Gateway switch state transitioned to ${newState}.`,
+      });
+      fetchOverview();
+    } catch (err) {
+      console.error("Failed to toggle breaker:", err);
+    }
+  };
+
+  const gatewayBreakers: GatewayBreaker[] =
+    circuitBreakers.length > 0
+      ? circuitBreakers.map((cb) => ({
+          name: `${cb.gateway} Bank Switch`,
+          type: cb.gateway === "HDFC" ? "UPI 2.0 / IMPS" : cb.gateway === "ICICI" ? "Corporate NetBanking" : "Core Banking",
+          state: cb.state as "CLOSED" | "HALF_OPEN" | "OPEN",
+          failureRate: cb.failure_count * 2.5,
+          threshold: cb.failure_threshold * 4.0,
+          lastTrip: cb.last_trip_time || "None in 24h",
+        }))
+      : [
+          {
+            name: "HDFC Bank UPI Switch",
+            type: "UPI 2.0 / IMPS",
+            state: "CLOSED",
+            failureRate: 1.8,
+            threshold: 15.0,
+            lastTrip: "None in 24h",
+          },
+          {
+            name: "ICICI Direct NetBanking",
+            type: "Corporate NetBanking",
+            state: "CLOSED",
+            failureRate: 3.4,
+            threshold: 20.0,
+            lastTrip: "None in 24h",
+          },
+          {
+            name: "SBI Payment Switch",
+            type: "Core Banking Gateway",
+            state: "HALF_OPEN",
+            failureRate: 14.2,
+            threshold: 20.0,
+            lastTrip: "42m ago",
+          },
+          {
+            name: "Axis Bank UPI Stack",
+            type: "UPI 2.0 Direct",
+            state: "CLOSED",
+            failureRate: 2.1,
+            threshold: 15.0,
+            lastTrip: "None in 24h",
+          },
+        ];
+
   return (
     <div className="w-full flex flex-col gap-space-lg pb-space-3xl animate-fade-in relative">
       {/* Top Command Banner */}
@@ -257,7 +332,7 @@ export const Overview: React.FC = () => {
           </p>
         </div>
 
-        {/* Action Toolset (All Buttons Wired & Interactive) */}
+        {/* Action Toolset */}
         <div className="flex items-center gap-space-xs flex-wrap">
           <button
             type="button"
@@ -307,7 +382,7 @@ export const Overview: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-space-sm">
         <StatCard
           title="At-Risk Revenue"
-          value={`?${atRiskRevenue.toFixed(2)}M`}
+          value={`₹${atRiskRevenue.toFixed(2)}M`}
           subtitle={`${(transactions.length * 856).toLocaleString()} failed txns today`}
           delta="+2.4% vs yday"
           deltaType="negative"
@@ -315,24 +390,24 @@ export const Overview: React.FC = () => {
         />
         <StatCard
           title="Recovered Revenue"
-          value={`?${recoveredRevenue.toFixed(2)}M`}
-          subtitle="54.26% recovered volume"
-          delta="+?1.12M baseline"
+          value={`₹${recoveredRevenue.toFixed(2)}M`}
+          subtitle={`${recoveryRate.toFixed(2)}% recovered volume`}
+          delta={`+₹${(recoveredRevenue * 0.14).toFixed(2)}M baseline`}
           deltaType="positive"
           icon="payments"
         />
         <StatCard
           title="Recovery Rate"
-          value="54.26%"
+          value={`${recoveryRate.toFixed(2)}%`}
           subtitle={`Target: >${thresholds.recoveryTarget.toFixed(2)}%`}
-          delta="+6.61% vs Rule"
+          delta={`+${aiLift.toFixed(2)}% vs Rule`}
           deltaType="positive"
           icon="verified"
         />
         <StatCard
           title="AI Revenue Lift"
-          value="+6.61%"
-          subtitle="+?520K incremental"
+          value={`+${aiLift.toFixed(2)}%`}
+          subtitle={`+₹${Math.round(recoveredRevenue * 1000 * 0.0661)}K incremental`}
           delta="5 Seeds Validated"
           deltaType="positive"
           icon="auto_mode"
@@ -340,7 +415,7 @@ export const Overview: React.FC = () => {
         <StatCard
           title="Active In-Flight"
           value={`${activeInFlight} active`}
-          subtitle={`${Math.round(activeInFlight * 0.65)} queue � ${Math.round(
+          subtitle={`${Math.round(activeInFlight * 0.65)} queue • ${Math.round(
             activeInFlight * 0.35
           )} exec`}
           delta="lag 8ms"
@@ -353,12 +428,14 @@ export const Overview: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
         <div className="lg:col-span-8 flex flex-col gap-space-lg">
           <TrendAreaChart
+            recoveredRate={`${recoveryRate.toFixed(2)}% Recovered`}
+            unrecoveredRate={`${(100 - recoveryRate).toFixed(2)}% Terminal Drop`}
             onRangeChange={(range) =>
               addToast({
                 id: Date.now().toString(),
                 type: "info",
                 title: `Trajectory Window Updated: ${range}`,
-                description: `Aggregating rolling telemetry across ${range} time window.`,
+                description: `Filtering historical data points for the trailing ${range} horizon.`,
               })
             }
           />
@@ -417,7 +494,7 @@ export const Overview: React.FC = () => {
               <div className="flex justify-between">
                 <span className="text-outline">EV Hard Floor:</span>
                 <span className="text-primary font-medium">
-                  = ?{thresholds.evFloor}.00
+                  ≥ ₹{thresholds.evFloor}.00
                 </span>
               </div>
               <div className="flex justify-between">
@@ -431,14 +508,8 @@ export const Overview: React.FC = () => {
 
       {/* Banking Partner Health with Reset / Trip capability */}
       <CircuitBreakerCard
-        onToggleBreaker={(name, state) =>
-          addToast({
-            id: Date.now().toString(),
-            type: state === "CLOSED" ? "success" : "warning",
-            title: `Circuit Breaker Altered: ${name}`,
-            description: `Gateway switch state transitioned to ${state}.`,
-          })
-        }
+        initialGateways={gatewayBreakers}
+        onToggleBreaker={handleToggleBreaker}
       />
 
       {/* Live Transaction Ledger with Inspect handler */}
@@ -465,7 +536,7 @@ export const Overview: React.FC = () => {
             id: Date.now().toString(),
             type: "success",
             title: "Thresholds Successfully Applied",
-            description: `Target set to ${newConfig.recoveryTarget}%, Trip rate ${newConfig.gatewayTripRate}%, EV Floor ?${newConfig.evFloor}.`,
+            description: `Target set to ${newConfig.recoveryTarget}%, Trip rate ${newConfig.gatewayTripRate}%, EV Floor ₹${newConfig.evFloor}.`,
           });
         }}
       />
@@ -477,4 +548,3 @@ export const Overview: React.FC = () => {
 };
 
 export default Overview;
-
