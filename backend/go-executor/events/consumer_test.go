@@ -55,8 +55,9 @@ func TestKafkaConsumerDeliversPaymentFailedEvent(t *testing.T) {
 	}
 
 	writer := &kafka.Writer{
-		Addr:  kafka.TCP("localhost:9092"),
-		Topic: "recovery.payment.failed",
+		Addr:                   kafka.TCP("localhost:9092"),
+		Topic:                  "recovery.payment.failed",
+		AllowAutoTopicCreation: true,
 	}
 
 	defer writer.Close()
@@ -119,8 +120,9 @@ func TestKafkaConsumerDoesNotCommitWhenHandlerFails(t *testing.T) {
 	}
 
 	writer := &kafka.Writer{
-		Addr:  kafka.TCP("localhost:9092"),
-		Topic: "recovery.payment.failed",
+		Addr:                   kafka.TCP("localhost:9092"),
+		Topic:                  "recovery.payment.failed",
+		AllowAutoTopicCreation: true,
 	}
 
 	defer writer.Close()
@@ -173,8 +175,9 @@ func TestConsumerCommitsOnlyAfterSuccessfulHandler(t *testing.T) {
 	}
 
 	writer := &kafka.Writer{
-		Addr:  kafka.TCP("localhost:9092"),
-		Topic: "recovery.payment.failed",
+		Addr:                   kafka.TCP("localhost:9092"),
+		Topic:                  "recovery.payment.failed",
+		AllowAutoTopicCreation: true,
 	}
 
 	defer writer.Close()

@@ -10,9 +10,10 @@ import (
 
 func TestKafkaPublisherPublishesPaymentFailedEvent(t *testing.T) {
 	writer := &kafka.Writer{
-		Addr:     kafka.TCP("localhost:9092"),
-		Topic:    "recovery.payment.failed",
-		Balancer: &kafka.LeastBytes{},
+		Addr:                   kafka.TCP("localhost:9092"),
+		Topic:                  "recovery.payment.failed",
+		Balancer:               &kafka.LeastBytes{},
+		AllowAutoTopicCreation: true,
 	}
 
 	defer writer.Close()
