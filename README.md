@@ -41,6 +41,84 @@ The AI never controls execution directly. The policy layer always has the final 
 
 ---
 
+## Mathematical Decision Model
+
+The recovery engine combines **supervised probability estimation** with
+**expected-value optimization**.
+
+The key idea is:
+
+> Predict the probability of recovery for every possible action, then choose the
+> action that maximizes expected recovered value after accounting for
+> intervention cost.
+
+### 1. Problem Formulation
+
+For a failed payment, let:
+
+- $X$ = payment/customer context
+- $A$ = candidate recovery action
+- $Y \in \{0,1\}$ = recovery outcome
+- $Y = 1$ = recovery succeeded
+- $Y = 0$ = recovery failed
+
+The system models:
+
+$$
+P(Y=1 \mid X,A)
+$$
+
+This is the probability that action $A$ successfully recovers a payment with
+context $X$.
+
+### 2. Context $X$
+
+The context contains information such as:
+
+$$
+X = (\mathrm{success\_rate},\ \mathrm{recovery\_rate},\ \mathrm{amount},\
+\mathrm{payment\_method},\ \mathrm{bank},\ \mathrm{failure\_code},\ \mathrm{hour})
+$$
+
+The action is included as an input feature because the same payment can have
+different recovery probabilities depending on the intervention.
+
+For example, the model evaluates each candidate action separately:
+
+```text
+Payment Context
+     + RETRY_NOW
+     -> P(recovery | context, RETRY_NOW)
+
+Payment Context
+     + RETRY_LATER
+     -> P(recovery | context, RETRY_LATER)
+
+Payment Context
+     + SEND_REMINDER
+     -> P(recovery | context, SEND_REMINDER)
+```
+
+### 3. Expected-Value Optimization
+
+For each action, the engine estimates the economic value of attempting recovery:
+
+$$
+EV(a) = P(Y=1 \mid X,a) \times \text{Amount} - \text{Cost}(a)
+$$
+
+The selected action is:
+
+$$
+a^* = \arg\max_{a \in A} EV(a)
+$$
+
+The selected action is then passed to Thompson Sampling and the deterministic
+policy gate. The policy gate has final authority and can replace the model's
+recommendation with `NO_ACTION`, `RETRY_LATER`, or another safe action.
+
+---
+
 ## Verified Results
 
 Controlled experiment across **10,000 synthetic payments** (2,978 failures, seed 42):

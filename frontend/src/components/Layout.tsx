@@ -30,6 +30,8 @@ export const Layout: React.FC<LayoutProps> = ({
   const [policyCount, setPolicyCount] = useState(4);
   const [modelVersion, setModelVersion] = useState("v2.4.1 (RF-Production)");
   const [searchQuery, setSearchQuery] = useState("");
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationsRead, setNotificationsRead] = useState(false);
 
   const fetchGlobalHeaderTelemetry = () => {
     recoveryApi
@@ -337,11 +339,78 @@ export const Layout: React.FC<LayoutProps> = ({
               </span>
             </div>
             <div className="flex items-center gap-space-md">
-              <div className="relative flex items-center cursor-pointer">
+              <div className="relative">
+                <button
+                  type="button"
+                  aria-label="Open notifications"
+                  aria-expanded={notificationsOpen}
+                  onClick={() => {
+                    setNotificationsOpen((open) => !open);
+                    setNotificationsRead(true);
+                  }}
+                  className="relative flex items-center cursor-pointer text-on-surface-variant hover:text-on-surface transition-colors"
+                >
                 <span className="material-symbols-outlined text-on-surface-variant hover:text-on-surface text-[20px]">
                   notifications
                 </span>
-                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-secondary"></span>
+                  {!notificationsRead && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-secondary" />
+                  )}
+                </button>
+                {notificationsOpen && (
+                  <div className="absolute right-0 top-9 w-80 rounded-lg border border-surface-container-high bg-surface-container-lowest shadow-2xl z-50">
+                    <div className="flex items-center justify-between px-space-sm py-space-sm border-b border-surface-container-high">
+                      <span className="font-label-caps text-label-caps text-on-surface uppercase">Notifications</span>
+                      <button
+                        type="button"
+                        onClick={() => setNotificationsOpen(false)}
+                        className="text-outline hover:text-on-surface"
+                        aria-label="Close notifications"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">close</span>
+                      </button>
+                    </div>
+                    <div className="p-space-sm flex flex-col gap-space-xs">
+                      <div className="flex gap-space-xs p-space-xs rounded bg-surface-container">
+                        <span className="material-symbols-outlined text-secondary text-[18px]">check_circle</span>
+                        <div className="min-w-0">
+                          <div className="font-body-sm text-body-sm text-on-surface">Recovery engine online</div>
+                          <div className="font-label-caps text-label-caps text-outline">{clusterStatus}</div>
+                        </div>
+                      </div>
+                      <div className="flex gap-space-xs p-space-xs rounded bg-surface-container">
+                        <span className="material-symbols-outlined text-primary text-[18px]">monitoring</span>
+                        <div className="min-w-0">
+                          <div className="font-body-sm text-body-sm text-on-surface">Kafka stream active</div>
+                          <div className="font-label-caps text-label-caps text-outline">Throughput: {streamRate}</div>
+                        </div>
+                      </div>
+                      <div className="flex gap-space-xs p-space-xs rounded bg-surface-container">
+                        <span className="material-symbols-outlined text-tertiary text-[18px]">model_training</span>
+                        <div className="min-w-0">
+                          <div className="font-body-sm text-body-sm text-on-surface">Model serving</div>
+                          <div className="font-label-caps text-label-caps text-outline">{modelVersion}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-space-xs px-space-sm pb-space-sm">
+                      <button
+                        type="button"
+                        onClick={() => { setCurrentPage("system-health"); setNotificationsOpen(false); }}
+                        className="flex-1 px-space-xs py-space-xs rounded bg-surface-container-high text-on-surface font-label-caps text-label-caps hover:bg-surface-container transition-colors"
+                      >
+                        System Health
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setCurrentPage("live-recovery"); setNotificationsOpen(false); }}
+                        className="flex-1 px-space-xs py-space-xs rounded bg-primary text-on-primary font-label-caps text-label-caps hover:bg-primary-container transition-colors"
+                      >
+                        Live Recovery
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-space-xs pl-space-sm">
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
