@@ -84,3 +84,30 @@ func TestExecutionWorkerProcessesQueuedCommand(t *testing.T) {
 		t.Fatal("worker did not stop after context cancellation")
 	}
 }
+func TestExecutionWorkerStopsWhileQueueIsEmpty(t *testing.T) {
+	queue := NewExecutionQueue(2)
+	executor := &recordingCommandExecutor{}
+
+	worker := NewExecutionWorker(queue, executor)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	done := make(chan struct{})
+
+	go func() {
+		worker.Run(ctx)
+		close(done)
+	}()
+
+	// Give the worker time to enter WaitDequeue().
+	time.Sleep(50 * time.Millisecond)
+
+	cancel()
+
+	select {
+	case <-done:
+		// expected
+	case <-time.After(1 * time.Second):
+		t.Fatal("worker did not stop while waiting on an empty queue")
+	}
+}

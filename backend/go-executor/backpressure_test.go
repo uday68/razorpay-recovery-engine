@@ -88,3 +88,66 @@ func TestExecutionQueueDequeuesCommands(t *testing.T) {
 		t.Fatal("expected queue to be empty")
 	}
 }
+func TestExecutionQueueWaitsForCommand(t *testing.T) {
+	queue := NewExecutionQueue(1)
+
+	done := make(chan RecoveryCommand, 1)
+
+	go func() {
+		command, ok := queue.WaitDequeue()
+		if !ok {
+			return
+		}
+
+		done <- command
+	}()
+
+	command := RecoveryCommand{
+		CommandID: "cmd-wait-001",
+		PaymentID: "pay-wait-001",
+		Action:    "RETRY_NOW",
+		Amount:    5000,
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	if err := queue.Enqueue(command); err != nil {
+		t.Fatalf("enqueue failed: %v", err)
+	}
+
+	select {
+	case got := <-done:
+		if got.CommandID != command.CommandID {
+			t.Fatalf(
+				"expected command_id %s, got %s",
+				command.CommandID,
+				got.CommandID,
+			)
+		}
+
+	case <-time.After(1 * time.Second):
+		t.Fatal("worker did not receive queued command")
+	}
+}
+func TestExecutionQueueReportsFull(t *testing.T) {
+	queue := NewExecutionQueue(1)
+
+	command := RecoveryCommand{
+		CommandID: "cmd-capacity-001",
+		PaymentID: "pay-capacity-001",
+		Action:    "RETRY_NOW",
+		Amount:    5000,
+	}
+
+	if queue.IsFull() {
+		t.Fatal("new queue should not be full")
+	}
+
+	if err := queue.Enqueue(command); err != nil {
+		t.Fatalf("enqueue failed: %v", err)
+	}
+
+	if !queue.IsFull() {
+		t.Fatal("queue should report full after reaching capacity")
+	}
+}

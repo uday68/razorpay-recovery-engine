@@ -75,3 +75,9 @@ func (q *ExecutionQueue) WaitDequeue() (RecoveryCommand, bool) {
 
 	return command, true
 }
+
+func (q *ExecutionQueue) IsFull() bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return len(q.items) >= q.capacity
+}

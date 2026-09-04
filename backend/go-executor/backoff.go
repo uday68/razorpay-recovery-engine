@@ -25,8 +25,11 @@ func (b *BackoffPolicy) Delay(attempt int) time.Duration {
 
 func (b *BackoffPolicy) DelayWithJitter(attempt int) time.Duration {
 	delay := b.Delay(attempt)
+	if delay <= 1 {
+		return delay
+	}
 
-	jitter := time.Duration(rand.Int63n(int64(delay / 2))) //
+	jitter := time.Duration(rand.Int63n(int64(delay / 2)))
 
 	return delay + jitter
 }
