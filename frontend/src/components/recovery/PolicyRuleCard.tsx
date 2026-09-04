@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { StatusPill } from "../ui/StatusPill";
 
 export interface PolicyRuleCardProps {
@@ -10,6 +10,7 @@ export interface PolicyRuleCardProps {
   actionOverride: string;
   enabledByDefault?: boolean;
   triggersToday?: number;
+  onToggle?: (id: string, enabled: boolean) => void;
 }
 
 export const PolicyRuleCard: React.FC<PolicyRuleCardProps> = ({
@@ -21,14 +22,21 @@ export const PolicyRuleCard: React.FC<PolicyRuleCardProps> = ({
   actionOverride,
   enabledByDefault = true,
   triggersToday = 142,
+  onToggle,
 }) => {
   const [enabled, setEnabled] = useState(enabledByDefault);
+
+  const handleToggle = () => {
+    const nextState = !enabled;
+    setEnabled(nextState);
+    onToggle?.(id, nextState);
+  };
 
   return (
     <div className="flex flex-col p-space-base rounded-lg bg-surface-container border border-surface-container-high/60 gap-space-sm hover:border-surface-container-highest transition-all">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-space-xs">
-          <span className="font-label-caps text-label-caps text-outline uppercase">
+          <span className="font-label-caps text-label-caps text-outline uppercase font-semibold">
             {priority}
           </span>
           <span className="font-mono-code text-[11px] text-outline">#{id}</span>
@@ -39,7 +47,8 @@ export const PolicyRuleCard: React.FC<PolicyRuleCardProps> = ({
             label={enabled ? "ACTIVE" : "DISABLED"}
           />
           <button
-            onClick={() => setEnabled(!enabled)}
+            type="button"
+            onClick={handleToggle}
             className={`w-9 h-5 flex items-center rounded-full p-0.5 transition-colors cursor-pointer ${
               enabled ? "bg-secondary justify-end" : "bg-surface-container-highest justify-start"
             }`}
@@ -80,4 +89,3 @@ export const PolicyRuleCard: React.FC<PolicyRuleCardProps> = ({
 };
 
 export default PolicyRuleCard;
-

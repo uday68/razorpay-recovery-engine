@@ -1,12 +1,23 @@
 ﻿import React, { useState, useEffect } from "react";
 import { recoveryApi, PolicySimulateResponse } from "../../api";
 
-export const PolicySimulationSandbox: React.FC = () => {
+export interface PolicySimulationSandboxProps {
+  onApply?: (config: {
+    confidenceFloor: number;
+    timeoutTolerance: number;
+    maxRetries: number;
+    projectedRecoveryRate: string;
+    projectedMonthlySavings: number;
+  }) => void;
+}
+
+export const PolicySimulationSandbox: React.FC<PolicySimulationSandboxProps> = ({ onApply }) => {
   const [confidenceFloor, setConfidenceFloor] = useState(55);
   const [timeoutTolerance, setTimeoutTolerance] = useState(800);
   const [maxRetries, setMaxRetries] = useState(3);
   const [simulation, setSimulation] = useState<PolicySimulateResponse | null>(null);
   const [simulating, setSimulating] = useState(false);
+  const [applied, setApplied] = useState(false);
 
   useEffect(() => {
     setSimulating(true);
@@ -34,6 +45,18 @@ export const PolicySimulationSandbox: React.FC = () => {
   const projectedMonthlySavings = simulation
     ? Math.round(simulation.simulated_recovered_revenue * 1000000)
     : Math.round(confidenceFloor * 42000);
+
+  const handleApply = () => {
+    setApplied(true);
+    onApply?.({
+      confidenceFloor,
+      timeoutTolerance,
+      maxRetries,
+      projectedRecoveryRate,
+      projectedMonthlySavings,
+    });
+    setTimeout(() => setApplied(false), 2500);
+  };
 
   return (
     <div className="flex flex-col p-space-base rounded-lg bg-surface-container border border-surface-container-high/60 gap-space-md">
@@ -146,8 +169,28 @@ export const PolicySimulationSandbox: React.FC = () => {
           </div>
         </div>
 
-        <button className="px-space-sm py-1.5 rounded bg-primary hover:bg-primary-container text-on-primary font-label-caps text-label-caps uppercase transition-colors cursor-pointer">
-          Apply Policy To Staging
+        <div className="flex items-center gap-space-sm">
+          <div>
+            <span className="text-outline text-[11px]">GATEWAY PROTECTION:</span>
+            <span className="text-primary font-semibold ml-2">
+              {simulation?.gateway_protection_score ?? 90}%
+            </span>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleApply}
+          className={`px-space-sm py-1.5 rounded font-label-caps text-label-caps uppercase transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1 ${
+            applied
+              ? "bg-secondary text-on-secondary"
+              : "bg-primary hover:bg-primary-container text-on-primary"
+          }`}
+        >
+          <span className="material-symbols-outlined text-[14px]">
+            {applied ? "check" : "rocket_launch"}
+          </span>
+          <span>{applied ? "Staged to Cluster ✓" : "Apply Policy To Staging"}</span>
         </button>
       </div>
     </div>
