@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { recoveryApi, AuditDetailResponse } from "../api";
 import { ActionBadge } from "../components/ui/ActionBadge";
 import { StatusPill } from "../components/ui/StatusPill";
@@ -6,24 +6,31 @@ import { CodeBlock } from "../components/ui/CodeBlock";
 import { ConfidenceBar } from "../components/ui/ConfidenceBar";
 
 export const PaymentInvestigation: React.FC = () => {
-  const [activePaymentId, setActivePaymentId] = useState("pay_rec_001");
+  const [activePaymentId, setActivePaymentId] = useState("");
   const [recentTransactions, setRecentTransactions] = useState<string[]>([]);
   const [auditData, setAuditData] = useState<AuditDetailResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [notFound, setNotFound] = useState(false);
 
   const fetchInvestigation = (id: string) => {
     if (!id.trim()) return;
     setLoading(true);
+    setNotFound(false);
     recoveryApi
       .getAuditDetail(id.trim())
       .then((data) => {
         if (data) {
           setAuditData(data);
           setActivePaymentId(data.payment_id);
+        } else {
+          setAuditData(null);
+          setNotFound(true);
         }
       })
       .catch((err) => {
-        console.warn("Using offline audit detail:", err);
+        console.warn("Audit lookup note:", err);
+        setAuditData(null);
+        setNotFound(true);
       })
       .finally(() => setLoading(false));
   };
@@ -38,12 +45,10 @@ export const PaymentInvestigation: React.FC = () => {
           const firstId = ids[0];
           setActivePaymentId(firstId);
           fetchInvestigation(firstId);
-        } else {
-          fetchInvestigation(activePaymentId);
         }
       })
-      .catch(() => {
-        fetchInvestigation(activePaymentId);
+      .catch((err) => {
+        console.warn("Error fetching transactions for investigation:", err);
       });
   }, []);
 
@@ -55,54 +60,12 @@ export const PaymentInvestigation: React.FC = () => {
 
   const rawJsonPayload = auditData
     ? JSON.stringify(auditData.raw_payload || auditData, null, 2)
-    : JSON.stringify(
-        {
-          payment_id: activePaymentId,
-          status: "FETCHING_FROM_POSTGRESQL",
-        },
-        null,
-        2
-      );
+    : notFound
+    ? JSON.stringify({ error: `Payment transaction '${activePaymentId}' not found in PostgreSQL recovery_audit ledger.` }, null, 2)
+    : JSON.stringify({ status: "SELECT_A_TRANSACTION_OR_SEARCH" }, null, 2);
 
-  const stateSteps = auditData?.state_steps && auditData.state_steps.length > 0
-    ? auditData.state_steps
-    : [
-        {
-          step: "STEP 1: INGESTION",
-          time: auditData?.timestamp ? auditData.timestamp.slice(11, 23) : "13:30:12.821",
-          status: "PAYMENT_FAILED",
-          description: `${auditData?.bank || "HDFC"} ${auditData?.payment_method || "UPI"} ${auditData?.failure_code || "TIMEOUT"}`,
-          color: "error",
-        },
-        {
-          step: "STEP 2: INFERENCE",
-          time: "+1.2ms",
-          status: "AI_DECISION_ENGINE",
-          description: `P(Recovery) = ${(auditData?.probabilities?.[auditData?.recommended_action || "RETRY_NOW"] ?? 0.82).toFixed(2)}`,
-          color: "primary",
-        },
-        {
-          step: "STEP 3: SAFETY GATE",
-          time: "+4.8ms",
-          status: auditData?.policy_allowed ? "POLICY_GATE_PASSED" : "POLICY_RESTRICTED",
-          description: auditData?.policy_reason || "Breaker Closed / EV Threshold Met",
-          color: "secondary",
-        },
-        {
-          step: "STEP 4: DISPATCH",
-          time: "+240ms",
-          status: auditData?.recovered ? "RECOVERED_SUCCESS" : (auditData?.outcome || "EXECUTED"),
-          description: `Action: ${auditData?.executed_action || auditData?.recommended_action || "RETRY_NOW"}`,
-          color: auditData?.recovered ? "secondary" : "tertiary",
-        },
-      ];
-
-  const probabilities = auditData?.probabilities || {
-    RETRY_NOW: 0.82,
-    RETRY_LATER: 0.12,
-    SEND_REMINDER: 0.05,
-    NO_ACTION: 0.01,
-  };
+  const stateSteps = auditData?.state_steps || [];
+  const probabilities = auditData?.probabilities || {};
 
   return (
     <div className="w-full flex flex-col gap-space-lg pb-space-3xl animate-fade-in">
@@ -172,10 +135,10 @@ export const PaymentInvestigation: React.FC = () => {
             Transaction Amount
           </span>
           <span className="font-mono-metric-md text-on-surface font-semibold mt-1">
-            ₹{auditData?.amount ? auditData.amount.toLocaleString("en-IN") : "5,200.00"}
+            {auditData ? `₹${auditData.amount.toLocaleString("en-IN")}` : "—"}
           </span>
           <span className="font-body-sm text-[11px] text-outline mt-0.5">
-            {auditData?.payment_method || "UPI"} / {auditData?.bank || "HDFC"} Bank
+            {auditData ? `${auditData.payment_method} / ${auditData.bank} Bank` : "Awaiting selection"}
           </span>
         </div>
 
@@ -184,10 +147,10 @@ export const PaymentInvestigation: React.FC = () => {
             Initial Failure Code
           </span>
           <span className="font-mono-code text-error font-semibold mt-1 truncate">
-            {auditData?.failure_code || "BANK_TIMEOUT"}
+            {auditData ? auditData.failure_code : "—"}
           </span>
           <span className="font-body-sm text-[11px] text-outline mt-0.5 truncate">
-            Customer: {auditData?.customer_id || "cust_live"}
+            Customer: {auditData ? auditData.customer_id : "—"}
           </span>
         </div>
 
@@ -196,10 +159,10 @@ export const PaymentInvestigation: React.FC = () => {
             Recommended Remediation
           </span>
           <div className="mt-1">
-            <ActionBadge action={(auditData?.recommended_action as any) || "RETRY_NOW"} />
+            {auditData ? <ActionBadge action={auditData.recommended_action as any} /> : <span className="text-outline text-[12px]">—</span>}
           </div>
           <span className="font-body-sm text-[11px] text-secondary mt-0.5 font-medium">
-            Expected Value: +₹{auditData?.expected_value ? auditData.expected_value.toFixed(2) : "416.00"}
+            Expected Value: {auditData ? `+₹${auditData.expected_value.toFixed(2)}` : "—"}
           </span>
         </div>
 
@@ -208,10 +171,10 @@ export const PaymentInvestigation: React.FC = () => {
             Final Settlement State
           </span>
           <div className="mt-1">
-            <StatusPill status={auditData?.recovered ? "RECOVERED" : (auditData?.outcome || "PENDING")} />
+            {auditData ? <StatusPill status={auditData.recovered ? "RECOVERED" : (auditData.outcome || "PENDING")} /> : <span className="text-outline text-[12px]">—</span>}
           </div>
           <span className="font-body-sm text-[11px] text-outline mt-0.5">
-            Attempts: {auditData?.attempts ?? 1} / 3 Hops Cap
+            Attempts: {auditData ? `${auditData.attempts ?? 1} / 3 Hops Cap` : "—"}
           </span>
         </div>
       </div>
@@ -221,34 +184,40 @@ export const PaymentInvestigation: React.FC = () => {
         <h3 className="font-headline-sm text-headline-sm text-on-surface font-medium">
           Remediation State Machine Traversal
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-space-sm font-mono-code text-[11px] mt-space-xs">
-          {stateSteps.map((s, idx) => (
-            <div
-              key={idx}
-              className={`p-space-sm rounded bg-surface-container-low border border-surface-container-high border-l-2 ${
-                s.color === "error"
-                  ? "border-l-error"
-                  : s.color === "primary"
-                  ? "border-l-primary"
-                  : "border-l-secondary"
-              }`}
-            >
-              <div className="text-outline text-[10px]">{s.step} • {s.time}</div>
+        {stateSteps.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-space-sm font-mono-code text-[11px] mt-space-xs">
+            {stateSteps.map((s, idx) => (
               <div
-                className={`font-semibold mt-1 ${
+                key={idx}
+                className={`p-space-sm rounded bg-surface-container-low border border-surface-container-high border-l-2 ${
                   s.color === "error"
-                    ? "text-error"
+                    ? "border-l-error"
                     : s.color === "primary"
-                    ? "text-primary"
-                    : "text-secondary"
+                    ? "border-l-primary"
+                    : "border-l-secondary"
                 }`}
               >
-                {s.status}
+                <div className="text-outline text-[10px]">{s.step} • {s.time}</div>
+                <div
+                  className={`font-semibold mt-1 ${
+                    s.color === "error"
+                      ? "text-error"
+                      : s.color === "primary"
+                      ? "text-primary"
+                      : "text-secondary"
+                  }`}
+                >
+                  {s.status}
+                </div>
+                <div className="text-outline text-[10px] mt-0.5 truncate">{s.description}</div>
               </div>
-              <div className="text-outline text-[10px] mt-0.5 truncate">{s.description}</div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-4 text-center text-outline text-body-sm font-mono-code">
+            {notFound ? `No record found for ${activePaymentId} in PostgreSQL ledger.` : "Select a transaction or enter Payment ID above."}
+          </div>
+        )}
       </div>
 
       {/* Model Decision Attribution */}
