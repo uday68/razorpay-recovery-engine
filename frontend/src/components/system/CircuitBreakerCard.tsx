@@ -1,17 +1,18 @@
-import React from "react";
+import React, { useState } from "react";
 import { StatusPill } from "../ui/StatusPill";
 
 export interface GatewayBreaker {
   name: string;
   type: string;
   state: "CLOSED" | "HALF_OPEN" | "OPEN";
-  failureRate: number; // percentage
+  failureRate: number;
   threshold: number;
   lastTrip: string;
 }
 
 export interface CircuitBreakerCardProps {
-  gateways?: GatewayBreaker[];
+  initialGateways?: GatewayBreaker[];
+  onToggleBreaker?: (name: string, newState: "CLOSED" | "OPEN") => void;
 }
 
 const defaultGateways: GatewayBreaker[] = [
@@ -50,8 +51,28 @@ const defaultGateways: GatewayBreaker[] = [
 ];
 
 export const CircuitBreakerCard: React.FC<CircuitBreakerCardProps> = ({
-  gateways = defaultGateways,
+  initialGateways = defaultGateways,
+  onToggleBreaker,
 }) => {
+  const [gateways, setGateways] = useState<GatewayBreaker[]>(initialGateways);
+
+  const handleToggle = (index: number) => {
+    setGateways((prev) =>
+      prev.map((gw, i) => {
+        if (i !== index) return gw;
+        const newState = gw.state === "CLOSED" ? "OPEN" : "CLOSED";
+        const newRate = newState === "CLOSED" ? 1.2 : gw.failureRate;
+        onToggleBreaker?.(gw.name, newState);
+        return {
+          ...gw,
+          state: newState,
+          failureRate: newRate,
+          lastTrip: newState === "OPEN" ? "Just Now (Manual Trip)" : "Reset to Normal",
+        };
+      })
+    );
+  };
+
   return (
     <div className="flex flex-col p-space-base rounded-lg bg-surface-container border border-surface-container-high/60 gap-space-sm">
       <div className="flex items-center justify-between">
@@ -69,54 +90,67 @@ export const CircuitBreakerCard: React.FC<CircuitBreakerCardProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-space-sm mt-space-xs">
-        {gateways.map((gw) => {
+        {gateways.map((gw, idx) => {
           const isHealthy = gw.state === "CLOSED";
           const isWarning = gw.state === "HALF_OPEN";
 
           return (
             <div
               key={gw.name}
-              className="flex flex-col p-space-sm rounded bg-surface-container-low border border-surface-container-high font-mono-code text-[11px] gap-1.5"
+              className="flex flex-col p-space-sm rounded bg-surface-container-low border border-surface-container-high font-mono-code text-[11px] gap-1.5 justify-between transition-all"
             >
-              <div className="flex items-center justify-between">
-                <span className="text-on-surface font-medium truncate">
-                  {gw.name}
-                </span>
-                <StatusPill
-                  status={
-                    isHealthy
-                      ? "OPTIMAL"
-                      : isWarning
-                      ? "PENDING"
-                      : "FAILED"
-                  }
-                  label={gw.state}
-                />
-              </div>
-              <span className="font-body-sm text-[11px] text-outline">
-                {gw.type}
-              </span>
-
-              <div className="mt-1 space-y-1 pt-space-2xs border-t border-surface-container-high/40">
-                <div className="flex justify-between">
-                  <span className="text-outline">Error Rate:</span>
-                  <span
-                    className={`font-semibold ${
-                      isHealthy
-                        ? "text-secondary"
-                        : isWarning
-                        ? "text-tertiary"
-                        : "text-error"
-                    }`}
-                  >
-                    {gw.failureRate}% / {gw.threshold}% max
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-on-surface font-medium truncate max-w-[130px]">
+                    {gw.name}
                   </span>
+                  <StatusPill
+                    status={
+                      isHealthy ? "OPTIMAL" : isWarning ? "PENDING" : "FAILED"
+                    }
+                    label={gw.state}
+                  />
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-outline">Last Tripped:</span>
-                  <span className="text-outline">{gw.lastTrip}</span>
+                <span className="font-body-sm text-[11px] text-outline block mt-0.5">
+                  {gw.type}
+                </span>
+
+                <div className="mt-2 space-y-1 pt-space-2xs border-t border-surface-container-high/40">
+                  <div className="flex justify-between">
+                    <span className="text-outline">Error Rate:</span>
+                    <span
+                      className={`font-semibold ${
+                        isHealthy
+                          ? "text-secondary"
+                          : isWarning
+                          ? "text-tertiary"
+                          : "text-error"
+                      }`}
+                    >
+                      {gw.failureRate}% / {gw.threshold}% max
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-outline">Last Tripped:</span>
+                    <span className="text-outline truncate max-w-[120px]">
+                      {gw.lastTrip}
+                    </span>
+                  </div>
                 </div>
               </div>
+
+              {/* Operator Action Button */}
+              <button
+                type="button"
+                onClick={() => handleToggle(idx)}
+                className={`mt-space-xs w-full py-1 rounded text-badge-label font-badge-label transition-colors cursor-pointer ${
+                  isHealthy
+                    ? "bg-surface-container-high hover:bg-error/20 hover:text-error text-outline"
+                    : "bg-secondary/20 hover:bg-secondary/30 text-secondary font-semibold"
+                }`}
+              >
+                {isHealthy ? "Simulate Trip" : "Reset Breaker"}
+              </button>
             </div>
           );
         })}

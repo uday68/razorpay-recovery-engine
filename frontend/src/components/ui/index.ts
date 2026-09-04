@@ -5,3 +5,4 @@ export * from "./ConfidenceBar";
 export * from "./SearchFilterBar";
 export * from "./CodeBlock";
 
+export * from "./Toast";
