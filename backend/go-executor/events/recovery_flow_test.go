@@ -1,16 +1,20 @@
 package events
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
 
 type flowDecisioner struct {
+	mu    sync.Mutex
 	calls int
 }
 
 func (d *flowDecisioner) Decide(event PaymentFailedEvent) (DecisionResult, error) {
+	d.mu.Lock()
 	d.calls++
+	d.mu.Unlock()
 
 	return DecisionResult{
 		PaymentID:     event.PaymentID,
@@ -21,11 +25,14 @@ func (d *flowDecisioner) Decide(event PaymentFailedEvent) (DecisionResult, error
 }
 
 type flowExecutor struct {
+	mu    sync.Mutex
 	calls int
 }
 
 func (e *flowExecutor) Execute(command RecoveryCommand) (ExecutionResult, error) {
+	e.mu.Lock()
 	e.calls++
+	e.mu.Unlock()
 
 	return ExecutionResult{
 		PaymentID: command.PaymentID,
@@ -149,4 +156,17 @@ func TestRecoveryFlowIgnoresDuplicateEvent(t *testing.T) {
 			executor.calls,
 		)
 	}
+}
+func (d *flowDecisioner) callCount() int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	return d.calls
+}
+
+func (e *flowExecutor) callCount() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	return e.calls
 }
