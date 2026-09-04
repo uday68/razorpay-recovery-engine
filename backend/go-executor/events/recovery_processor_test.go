@@ -68,3 +68,61 @@ func TestRecoveryProcessorCallsDecisionService(t *testing.T) {
 		)
 	}
 }
+func TestRecoveryProcessorCreatesRecoveryCommand(t *testing.T) {
+	client := &fakeDecisionClient{
+		result: DecisionResult{
+			PaymentID:     "pay-processor-002",
+			Action:        "RETRY_LATER",
+			Probability:   0.65,
+			ExpectedValue: 3248,
+		},
+	}
+
+	processor := NewDecisionRecoveryProcessor(client)
+
+	event := PaymentFailedEvent{
+		EventID:       "evt-processor-002",
+		EventType:     "PAYMENT_FAILED",
+		PaymentID:     "pay-processor-002",
+		CustomerID:    "cust-processor-002",
+		Amount:        5000,
+		PaymentMethod: "UPI",
+		Bank:          "HDFC",
+		FailureCode:   "BANK_TIMEOUT",
+		SuccessRate:   0.80,
+		RecoveryRate:  0.50,
+		Timestamp:     time.Now().UTC(),
+	}
+
+	command, err := processor.Process(event)
+	if err != nil {
+		t.Fatalf("processor failed: %v", err)
+	}
+
+	if command.PaymentID != event.PaymentID {
+		t.Fatalf(
+			"expected payment_id %s, got %s",
+			event.PaymentID,
+			command.PaymentID,
+		)
+	}
+
+	if command.Action != "RETRY_LATER" {
+		t.Fatalf(
+			"expected action RETRY_LATER, got %s",
+			command.Action,
+		)
+	}
+
+	if command.Amount != event.Amount {
+		t.Fatalf(
+			"expected amount %v, got %v",
+			event.Amount,
+			command.Amount,
+		)
+	}
+
+	if command.CommandID == "" {
+		t.Fatal("expected command_id to be generated")
+	}
+}
