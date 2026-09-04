@@ -343,14 +343,72 @@ All dashboards and metrics explicitly label their source:
 
 ## Quick Start
 
-### 1 — Infrastructure
+### Prerequisites
+
+- Python 3.10 or newer
+- Docker Desktop or Docker Engine with Docker Compose
+- Go 1.22 or newer
+- Node.js 18 or newer and npm
+
+The Compose services use Linux images (`postgres:16`, `redis:7-alpine`, and
+`apache/kafka:4.0.0`). On Windows or macOS, Docker Desktop must be using
+**Linux containers**. The setup script can start Docker Desktop when it is
+installed, but Docker itself must be installed first.
+
+### Automated Setup
+
+Run these commands from any directory after cloning. The script resolves paths
+relative to itself, so the repository does not need to be installed in a
+specific location:
+
+```powershell
+python path\to\razorpay-recovery-engine\setup_and_run.py
+```
+
+The runner checks Python and Docker, installs missing Python packages from
+`requirements.txt`, validates the Compose file, checks the configured images,
+pulls missing images, starts PostgreSQL, Redis, and Kafka, generates the
+dataset, trains the model, runs tests, and executes the inference smoke test.
+
+Useful modes:
+
+```powershell
+# Start only Docker infrastructure
+python setup_and_run.py --docker
+
+# Stop Docker infrastructure
+python setup_and_run.py --stop-docker
+
+# Generate data and train the model
+python setup_and_run.py --train
+
+# Run dependency checks and tests
+python setup_and_run.py --test
+
+# Start Docker, FastAPI, Go, React, the live injector, and proof stream
+python setup_and_run.py --launch
+```
+
+`--launch` keeps the terminal attached and stops all application processes
+together when you press `Ctrl+C`. FastAPI runs on `http://localhost:8000`, the
+Go executor on `http://localhost:8080`, and Vite normally uses
+`http://localhost:5173`.
+
+If Docker is not installed, the normal setup continues with local Python
+steps. If Docker is installed but its engine is stopped, the runner attempts
+to start it; use `--docker` to require infrastructure startup and report any
+failure. Python itself must be installed before running the script.
+
+### Manual Setup
+
+#### 1 — Infrastructure
 
 ```bash
 docker compose up -d
 # starts PostgreSQL · Kafka · Redis
 ```
 
-### 2 — Python Environment
+#### 2 — Python Environment
 
 ```powershell
 python -m venv .venv
@@ -358,7 +416,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 3 — Services
+#### 3 — Services
 
 ```bash
 # Python AI Decision API

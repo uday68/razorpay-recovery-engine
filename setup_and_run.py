@@ -13,7 +13,10 @@ Usage:
   python setup_and_run.py --fast    # Fast mode (smaller dataset for rapid training)
   python setup_and_run.py --train   # Only generate dataset & train model
   python setup_and_run.py --test    # Only run dependency check & test suite
-  python setup_and_run.py --smoke   # Only run live AI inference smoke tests
+    python setup_and_run.py --smoke   # Only run live AI inference smoke tests
+    python setup_and_run.py --docker  # Start local Docker Compose infrastructure
+    python setup_and_run.py --stop-docker  # Stop local Docker Compose infrastructure
+    python setup_and_run.py --launch  # Start the complete local application stack
 """
 
 from __future__ import annotations
@@ -74,6 +77,332 @@ def check_port(host: str, port: int, timeout: float = 1.0) -> bool:
     except OSError:
         return False
 
+def docker_version() -> str | None:
+    """Return the Docker CLI version, or None when Docker is unavailable."""
+    if shutil.which("docker") is None:
+        return None
+    result = subprocess.run(
+        ["docker", "--version"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return result.stdout.strip()
+    return None
+
+def docker_compose_command() -> list[str] | None:
+    """Return the available Docker Compose command, if Docker is installed."""
+    if docker_version() is not None:
+        result = subprocess.run(
+            ["docker", "compose", "version"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            return ["docker", "compose"]
+
+    if shutil.which("docker-compose"):
+        return ["docker-compose"]
+
+    return None
+
+def docker_daemon_available() -> bool:
+    """Return whether the Docker engine is reachable."""
+    if shutil.which("docker") is None:
+        return False
+    result = subprocess.run(
+        ["docker", "info"],
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0
+
+def start_docker_engine(timeout: int = 90) -> bool:
+    """Start the local Docker application/service and wait for its engine."""
+    if docker_daemon_available():
+        return True
+
+    print(f"  {YELLOW}Docker CLI is installed, but the engine is stopped. Starting it...{R}")
+    try:
+        if sys.platform == "win32":
+            docker_desktop = Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "Docker" / "Docker" / "Docker Desktop.exe"
+            if not docker_desktop.exists():
+                docker_desktop = Path(os.environ.get("LOCALAPPDATA", "")) / "Docker" / "Docker" / "Docker Desktop.exe"
+            if not docker_desktop.exists():
+                print(f"  {RED}Docker Desktop executable was not found.{R}")
+                return False
+            subprocess.Popen([str(docker_desktop)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", "-a", "Docker"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif shutil.which("systemctl"):
+            result = subprocess.run(["systemctl", "start", "docker"], capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"  {RED}Could not start the Docker service automatically.{R}")
+                return False
+        else:
+            print(f"  {RED}No supported Docker startup command was found.{R}")
+            return False
+    except OSError as exc:
+        print(f"  {RED}Could not start Docker: {exc}{R}")
+        return False
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if docker_daemon_available():
+            print(f"  {GREEN}{BOLD}✓ Docker engine is ready.{R}")
+            return True
+        time.sleep(2)
+
+    print(f"  {RED}{BOLD}Docker engine did not become ready within {timeout} seconds.{R}")
+    return False
+
+def docker_server_os() -> str | None:
+    """Return the container operating system used by the Docker daemon."""
+    if not docker_daemon_available():
+        return None
+    result = subprocess.run(
+        ["docker", "info", "--format", "{{.OSType}}"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        return result.stdout.strip().lower()
+    return None
+
+def compose_images(compose: list[str], compose_file: Path) -> list[str] | None:
+    """Read image names from the resolved Compose configuration."""
+    result = subprocess.run(
+        compose + ["-f", str(compose_file), "config", "--images"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print(f"  {RED}{BOLD}Docker Compose configuration is invalid.{R}")
+        if result.stderr.strip():
+            print(f"  {DIM}{result.stderr.strip()}{R}")
+        return None
+    return [image.strip() for image in result.stdout.splitlines() if image.strip()]
+
+def ensure_python_requirements() -> bool:
+    """Install requirements when imports from requirements.txt are missing."""
+    if sys.version_info < (3, 10):
+        print(f"  {RED}{BOLD}Python 3.10 or newer is required.{R}")
+        print(f"  {DIM}Install Python from https://www.python.org/downloads/ and retry.{R}")
+        return False
+
+    requirements_file = ROOT / "requirements.txt"
+    if not requirements_file.exists():
+        print(f"  {RED}{BOLD}Missing requirements file: {requirements_file}{R}")
+        return False
+
+    required_modules = [
+        "fastapi", "uvicorn", "pydantic", "psycopg", "redis", "shap",
+        "sklearn", "pandas", "numpy", "pytest", "requests",
+    ]
+    missing = []
+    for module_name in required_modules:
+        try:
+            importlib.import_module(module_name)
+        except ImportError:
+            missing.append(module_name)
+
+    if not missing:
+        return True
+
+    print(f"  {YELLOW}Missing Python packages: {', '.join(missing)}{R}")
+    print(f"  Installing dependencies from {CYAN}{requirements_file.name}{R}...")
+    result = subprocess.run(
+        [sys.executable, "-m", "pip", "install", "-r", str(requirements_file)],
+        cwd=ROOT,
+    )
+    if result.returncode != 0:
+        print(f"  {RED}{BOLD}Python dependency installation failed.{R}")
+        return False
+    return True
+
+def command_available(command: str) -> bool:
+    return shutil.which(command) is not None
+
+def command_path(command: str) -> str | None:
+    """Resolve a subprocess-safe executable path across operating systems."""
+    candidates = [command]
+    if sys.platform == "win32" and Path(command).suffix == "":
+        candidates = [f"{command}.cmd", f"{command}.exe", command]
+    for candidate in candidates:
+        resolved = shutil.which(candidate)
+        if resolved:
+            return resolved
+    return None
+
+def step_launch_stack() -> None:
+    """Launch the API, Go executor, frontend, injector, and proof processes."""
+    section(7, "STARTING COMPLETE APPLICATION STACK")
+
+    if not ensure_python_requirements():
+        raise SystemExit(1)
+
+    if docker_compose_command() is None:
+        print(f"  {RED}{BOLD}Docker Compose is required to launch the application stack.{R}")
+        raise SystemExit(1)
+    if not step_docker_compose():
+        raise SystemExit(1)
+
+    required_commands = [("go", "Go executor"), ("npm", "React frontend")]
+    resolved_commands = {
+        command: command_path(command)
+        for command, _ in required_commands
+    }
+    missing_commands = [
+        label
+        for command, label in required_commands
+        if resolved_commands[command] is None
+    ]
+    if missing_commands:
+        print(f"  {RED}{BOLD}Missing required tools: {', '.join(missing_commands)}{R}")
+        raise SystemExit(1)
+
+    frontend_dir = ROOT / "frontend"
+    if not (frontend_dir / "node_modules").exists():
+        print(f"  {YELLOW}Frontend dependencies are missing; running npm install...{R}")
+        install = subprocess.run([resolved_commands["npm"], "install"], cwd=frontend_dir, text=True)
+        if install.returncode != 0:
+            raise SystemExit("Frontend dependency installation failed.")
+
+    processes: list[tuple[str, subprocess.Popen]] = []
+    commands = [
+        ("FastAPI", [sys.executable, "-m", "uvicorn", "backend.api.app:app", "--host", "0.0.0.0", "--port", "8000"], ROOT),
+        ("Go executor", [resolved_commands["go"], "run", "."], ROOT / "backend" / "go-executor"),
+        ("React frontend", [resolved_commands["npm"], "run", "dev"], frontend_dir),
+        ("Live injector", [sys.executable, "backend/live_injector.py", "--rate", "2.0"], ROOT),
+        ("Live proof", [sys.executable, "backend/demo_proof.py", "--loop"], ROOT),
+    ]
+
+    try:
+        for name, command, cwd in commands:
+            print(f"  Starting {name}: {CYAN}{' '.join(command)}{R}")
+            try:
+                process = subprocess.Popen(command, cwd=cwd)
+            except OSError as exc:
+                print(f"  {RED}{BOLD}Could not start {name}: {exc}{R}")
+                raise SystemExit(1) from exc
+            processes.append((name, process))
+            time.sleep(1)
+
+        print(f"\n  {GREEN}{BOLD}All services started. Press Ctrl+C to stop them.{R}")
+        while True:
+            failed = [(name, process.returncode) for name, process in processes if process.poll() is not None]
+            if failed:
+                details = ", ".join(f"{name} exited with {code}" for name, code in failed)
+                print(f"  {RED}{BOLD}{details}{R}")
+                break
+            time.sleep(2)
+    except KeyboardInterrupt:
+        print(f"\n  {YELLOW}Stopping application stack...{R}")
+    finally:
+        for _, process in processes:
+            if process.poll() is None:
+                process.terminate()
+        for _, process in processes:
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+
+def step_docker_compose(stop: bool = False) -> bool:
+    action = "STOP" if stop else "START"
+    section(1, f"DOCKER COMPOSE INFRASTRUCTURE {action}")
+
+    version = docker_version()
+    if version is None:
+        print(f"  {RED}{BOLD}Docker CLI was not found or docker --version failed.{R}")
+        return False
+    print(f"  Docker CLI          : {version} {status_badge('FOUND', True)}")
+
+    compose = docker_compose_command()
+    if compose is None:
+        print(f"  {RED}{BOLD}Docker Compose is not available.{R}")
+        return False
+
+    if stop:
+        if not docker_daemon_available():
+            print(f"  {RED}{BOLD}Docker engine is not running; there is nothing to stop.{R}")
+            return False
+    elif not start_docker_engine():
+        print(f"  {DIM}Start Docker Desktop manually, then retry this command.{R}")
+        return False
+
+    server_os = docker_server_os()
+    if server_os != "linux":
+        print(f"  {RED}{BOLD}This project requires a Linux-container Docker engine.{R}")
+        print(f"  Docker server OS: {server_os or 'unknown'}")
+        print(f"  {DIM}On Windows or macOS, switch Docker Desktop to Linux containers.{R}")
+        return False
+    print(f"  Docker server OS    : {server_os} {status_badge('SUPPORTED', True)}")
+
+    compose_file = ROOT / "docker-compose.yml"
+    if not compose_file.exists():
+        print(f"  {RED}{BOLD}Missing Docker Compose file: {compose_file}{R}")
+        return False
+
+    images = compose_images(compose, compose_file)
+    if images is None:
+        return False
+    print(f"  Compose images: {', '.join(images)}")
+
+    missing_images = []
+    for image in images:
+        inspect = subprocess.run(
+            ["docker", "image", "inspect", image],
+            capture_output=True,
+            text=True,
+        )
+        if inspect.returncode != 0:
+            missing_images.append(image)
+
+    if missing_images:
+        print(f"  {YELLOW}Pulling missing images: {', '.join(missing_images)}{R}")
+        pull = subprocess.run(
+            compose + ["-f", str(compose_file), "pull"],
+            cwd=ROOT,
+            text=True,
+        )
+        if pull.returncode != 0:
+            print(f"  {RED}{BOLD}Docker image download failed.{R}")
+            return False
+
+    command = compose + ["-f", str(compose_file)]
+    command += ["down"] if stop else ["up", "-d"]
+    print(f"  Running: {CYAN}{' '.join(command)}{R}")
+    result = subprocess.run(command, cwd=ROOT, text=True)
+    if result.returncode != 0:
+        print(f"  {RED}{BOLD}Docker Compose command failed.{R}")
+        return False
+
+    if stop:
+        print(f"  {GREEN}{BOLD}✓ Docker Compose services stopped.{R}")
+        return True
+
+    required_ports = [("PostgreSQL", 5432), ("Redis", 6379), ("Kafka", 9092)]
+    deadline = time.monotonic() + 90
+    pending = required_ports
+    while pending and time.monotonic() < deadline:
+        pending = [
+            (name, port)
+            for name, port in pending
+            if not check_port("localhost", port, timeout=0.5)
+        ]
+        if pending:
+            time.sleep(2)
+
+    if pending:
+        services = ", ".join(name for name, _ in pending)
+        print(f"  {RED}{BOLD}Services did not become reachable: {services}{R}")
+        return False
+
+    print(f"  {GREEN}{BOLD}✓ Docker Compose services are running and reachable.{R}")
+    return True
+
 def progress_bar(val: float, max_val: float = 1.0, width: int = 24) -> str:
     filled = int(round((val / max_val) * width)) if max_val > 0 else 0
     filled = max(0, min(width, filled))
@@ -88,7 +417,7 @@ def fmt_inr(val: float) -> str:
 
 # ── 1. DEPENDENCY & ENVIRONMENT VERIFICATION ──────────────────────────────────
 def step_dependencies() -> bool:
-    section(1, "SYSTEM ENVIRONMENT & DEPENDENCY VERIFICATION")
+    section(2, "SYSTEM ENVIRONMENT & DEPENDENCY VERIFICATION")
 
     # Python version
     py_ver = sys.version.split()[0]
@@ -138,22 +467,22 @@ def step_dependencies() -> bool:
     # Infrastructure Ports (PostgreSQL, Redis, Kafka, Go Executor, Python API)
     print(f"\n  {BOLD}Infrastructure Connectivity (Local Ports):{R}")
     ports = [
-        ("PostgreSQL Database", 5432),
-        ("Redis State & Limiter", 6379),
-        ("Apache Kafka Broker", 9092),
-        ("Go Recovery Executor", 8080),
-        ("Python Decision Engine", 8000),
+        ("PostgreSQL Database", 5432, "docker"),
+        ("Redis State & Limiter", 6379, "docker"),
+        ("Apache Kafka Broker", 9092, "docker"),
+        ("Go Recovery Executor", 8080, "application"),
+        ("Python Decision Engine", 8000, "application"),
     ]
-    for service_name, port in ports:
+    for service_name, port, owner in ports:
         is_up = check_port("localhost", port, timeout=0.5)
-        status_txt = f"{GREEN}LISTENING (: {port}){R}" if is_up else f"{YELLOW}INACTIVE / DOCKER{R}"
+        status_txt = f"{GREEN}LISTENING (: {port}){R}" if is_up else f"{YELLOW}INACTIVE / {owner.upper()}{R}"
         print(f"    • {service_name:<34}: {status_txt}")
 
     return all_packages_ok
 
 # ── 2. DATASET GENERATION ─────────────────────────────────────────────────────
 def step_dataset(fast: bool = False, force: bool = False) -> Path:
-    section(2, "SYNTHETIC PAYMENT DATASET GENERATION")
+    section(3, "SYNTHETIC PAYMENT DATASET GENERATION")
 
     data_path = ROOT / "ml" / "data.csv"
     if data_path.exists() and not force:
@@ -210,7 +539,7 @@ def step_dataset(fast: bool = False, force: bool = False) -> Path:
 
 # ── 3. MACHINE LEARNING MODEL TRAINING ────────────────────────────────────────
 def step_train(fast: bool = False) -> Path:
-    section(3, "RANDOM FOREST CLASSIFIER TRAINING & VALIDATION")
+    section(4, "RANDOM FOREST CLASSIFIER TRAINING & VALIDATION")
 
     import pandas as pd
     from sklearn.model_selection import train_test_split
@@ -294,7 +623,7 @@ def step_train(fast: bool = False) -> Path:
 
 # ── 4. SUBSYSTEM TEST SUITE VERIFICATION ──────────────────────────────────────
 def step_test_suite() -> bool:
-    section(4, "SUBSYSTEM INTEGRITY & ADVANCED FEATURE VERIFICATION")
+    section(5, "SUBSYSTEM INTEGRITY & ADVANCED FEATURE VERIFICATION")
 
     test_targets = [
         ("EV Decision Engine", "backend/decision/test_engine.py"),
@@ -328,7 +657,7 @@ def step_test_suite() -> bool:
 
 # ── 5. LIVE AI DECISION ENGINE SMOKE TEST ─────────────────────────────────────
 def step_smoke_test() -> None:
-    section(5, "LIVE AI INFERENCE SMOKE TEST (RANDOM FOREST -> EV -> POLICY)")
+    section(6, "LIVE AI INFERENCE SMOKE TEST (RANDOM FOREST -> EV -> POLICY)")
 
     from ml.model_store import load_model
     from backend.experiment import predict_actions
@@ -427,25 +756,56 @@ def main() -> None:
     parser.add_argument("--train", action="store_true", help="Only generate dataset and train model")
     parser.add_argument("--test", action="store_true", help="Only run tests and validations")
     parser.add_argument("--smoke", action="store_true", help="Only run live AI smoke tests")
+    parser.add_argument("--docker", action="store_true", help="Start local infrastructure with Docker Compose")
+    parser.add_argument("--stop-docker", action="store_true", help="Stop local Docker Compose infrastructure")
+    parser.add_argument("--launch", action="store_true", help="Start the complete local application stack")
     args = parser.parse_args()
 
     banner("RAZORPAY AI REVENUE RECOVERY ENGINE", "Automated Setup · Data Synthesis · ML Training · Verification")
 
     if args.smoke:
+        if not ensure_python_requirements():
+            raise SystemExit(1)
         step_smoke_test()
         return
 
+    if args.docker:
+        if not step_docker_compose():
+            raise SystemExit(1)
+        return
+
+    if args.stop_docker:
+        if not step_docker_compose(stop=True):
+            raise SystemExit(1)
+        return
+
+    if args.launch:
+        step_launch_stack()
+        return
+
     if args.test:
+        if not ensure_python_requirements():
+            raise SystemExit(1)
         step_dependencies()
         step_test_suite()
         return
 
     if args.train:
+        if not ensure_python_requirements():
+            raise SystemExit(1)
         step_dataset(fast=args.fast, force=args.force)
         step_train(fast=args.fast)
         return
 
     # Default: Run full pipeline
+    if not ensure_python_requirements():
+        raise SystemExit(1)
+    compose = docker_compose_command()
+    if compose is None:
+        print(f"\n  {YELLOW}{BOLD}Docker Compose is not installed; skipping local infrastructure startup.{R}")
+        print(f"  {DIM}Install Docker Desktop to enable PostgreSQL, Redis, and Kafka services.{R}")
+    elif not step_docker_compose():
+        print(f"\n  {YELLOW}{BOLD}Docker infrastructure could not be started; continuing with local Python steps.{R}")
     step_dependencies()
     step_dataset(fast=args.fast, force=args.force)
     step_train(fast=args.fast)

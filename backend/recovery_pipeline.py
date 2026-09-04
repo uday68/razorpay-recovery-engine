@@ -125,6 +125,7 @@ class RecoveryPipeline:
             action=recommended_action,
             amount=amount,
             probability=selected_probability,
+            expected_value=decision["expected_value"],
         )
 
         executed_action = policy["action"]

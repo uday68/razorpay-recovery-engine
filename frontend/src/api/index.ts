@@ -303,6 +303,14 @@ export interface PolicySimulateRequest {
   auto_recovery_enabled?: boolean;
 }
 
+export interface PolicyConfig {
+  recovery_target: number;
+  gateway_trip_rate: number;
+  ev_floor: number;
+  max_hops: number;
+  auto_recovery_enabled: boolean;
+}
+
 export interface PolicySimulateResponse {
   status?: string;
   source?: string;
@@ -511,6 +519,22 @@ export const recoveryApi = {
       body: JSON.stringify(req),
     });
     if (!res.ok) throw new Error(`Policy simulation error: ${res.status}`);
+    return res.json();
+  },
+
+  async getPolicyConfig(): Promise<PolicyConfig> {
+    const res = await fetch(`${AI_API_URL}/v1/policies/config`);
+    if (!res.ok) throw new Error(`Policy config API error: ${res.status}`);
+    return res.json();
+  },
+
+  async updatePolicyConfig(config: PolicyConfig): Promise<PolicyConfig> {
+    const res = await fetch(`${AI_API_URL}/v1/policies/config`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+    if (!res.ok) throw new Error(`Policy config API error: ${res.status}`);
     return res.json();
   },
 

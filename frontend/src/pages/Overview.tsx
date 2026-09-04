@@ -54,6 +54,18 @@ export const Overview: React.FC = () => {
 
   useEffect(() => {
     fetchOverview();
+    recoveryApi
+      .getPolicyConfig()
+      .then((config) => {
+        setThresholds({
+          recoveryTarget: config.recovery_target,
+          gatewayTripRate: config.gateway_trip_rate,
+          evFloor: config.ev_floor,
+          maxHops: config.max_hops,
+          autoRecoveryEnabled: config.auto_recovery_enabled,
+        });
+      })
+      .catch((err) => console.warn("Using local policy thresholds:", err));
   }, []);
 
   // Policy Thresholds configuration
@@ -447,12 +459,34 @@ export const Overview: React.FC = () => {
         onClose={() => setIsThresholdsOpen(false)}
         currentConfig={thresholds}
         onSave={(newConfig) => {
-          setThresholds(newConfig);
-          addToast({
-            id: Date.now().toString(),
-            type: "success",
-            title: "Thresholds Successfully Applied",
-            description: `Target set to ${newConfig.recoveryTarget}%, Trip rate ${newConfig.gatewayTripRate}%, EV Floor ₹${newConfig.evFloor}.`,
+          recoveryApi.updatePolicyConfig({
+            recovery_target: newConfig.recoveryTarget,
+            gateway_trip_rate: newConfig.gatewayTripRate,
+            ev_floor: newConfig.evFloor,
+            max_hops: newConfig.maxHops,
+            auto_recovery_enabled: newConfig.autoRecoveryEnabled,
+          }).then((savedConfig) => {
+            setThresholds({
+              recoveryTarget: savedConfig.recovery_target,
+              gatewayTripRate: savedConfig.gateway_trip_rate,
+              evFloor: savedConfig.ev_floor,
+              maxHops: savedConfig.max_hops,
+              autoRecoveryEnabled: savedConfig.auto_recovery_enabled,
+            });
+            addToast({
+              id: Date.now().toString(),
+              type: "success",
+              title: "Thresholds Successfully Applied",
+              description: `Target set to ${savedConfig.recovery_target}%, Trip rate ${savedConfig.gateway_trip_rate}%, EV Floor ₹${savedConfig.ev_floor}.`,
+            });
+          }).catch((err) => {
+            console.error("Failed to update policy thresholds:", err);
+            addToast({
+              id: Date.now().toString(),
+              type: "error",
+              title: "Threshold Update Failed",
+              description: "Could not save policy thresholds to the recovery backend.",
+            });
           });
         }}
       />

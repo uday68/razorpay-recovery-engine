@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.audit_repository import AuditRepository
 from backend.decision.engine import choose_action
 from backend.experiment import predict_actions
-from backend.policy.engine import apply_policy
+from backend.policy.engine import apply_policy, get_policy_config, update_policy_config
 from ml.model_store import load_model
 
 from backend.bandit import ThompsonSamplingBandit
@@ -70,6 +70,7 @@ try:
         PolicyItem,
         PolicySimulateRequest,
         PolicySimulateResponse,
+        PolicyConfig,
         RecoveryDecisionRequest,
         RecoveryDecisionResponse,
         StateStepItem,
@@ -98,6 +99,7 @@ except ImportError:
         PolicyItem,
         PolicySimulateRequest,
         PolicySimulateResponse,
+        PolicyConfig,
         RecoveryDecisionRequest,
         RecoveryDecisionResponse,
         StateStepItem,
@@ -304,6 +306,7 @@ def decide_recovery(request: RecoveryDecisionRequest) -> RecoveryDecisionRespons
         action=recommended_action,
         amount=request.amount,
         probability=selected_probability,
+        expected_value=decision["expected_value"],
     )
     final_action = policy["action"]
     final_prob = probabilities.get(final_action, selected_probability)
@@ -735,6 +738,16 @@ def get_model_health() -> AIModelHealthResponse:
 # ==========================================
 # 6. Policy Rules & Simulation Sandbox
 # ==========================================
+@app.get("/v1/policies/config", response_model=PolicyConfig)
+def get_policy_configuration() -> PolicyConfig:
+    return get_policy_config()
+
+
+@app.put("/v1/policies/config", response_model=PolicyConfig)
+def update_policy_configuration(config: PolicyConfig) -> PolicyConfig:
+    return update_policy_config(config)
+
+
 @app.get("/v1/policies", response_model=List[PolicyItem])
 def get_policies() -> List[PolicyItem]:
     p0_floor = 0

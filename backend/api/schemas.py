@@ -189,6 +189,14 @@ class PolicySimulateRequest(BaseModel):
     auto_recovery_enabled: bool = True
 
 
+class PolicyConfig(BaseModel):
+    recovery_target: float = Field(default=50.0, ge=0.0, le=100.0)
+    gateway_trip_rate: float = Field(default=15.0, ge=0.0, le=100.0)
+    ev_floor: float = Field(default=50.0, ge=0.0)
+    max_hops: int = Field(default=3, ge=1, le=10)
+    auto_recovery_enabled: bool = True
+
+
 class PolicySimulateResponse(BaseModel):
     status: str = "SIMULATED"
     source: str = "policy_simulation_sandbox"
