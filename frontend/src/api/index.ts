@@ -428,6 +428,17 @@ export const recoveryApi = {
     return res.json();
   },
 
+  /** Full-pipeline injection: RF → EV → Thompson Sampling → Policy → Executor → PostgreSQL */
+  async injectEvent(payload?: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const res = await fetch(`${AI_API_URL}/v1/recovery/inject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload ? JSON.stringify(payload) : '{}',
+    });
+    if (!res.ok) throw new Error(`Inject API error: ${res.status}`);
+    return res.json();
+  },
+
   async getTransactions(params?: {
     limit?: number;
     gateway?: string;

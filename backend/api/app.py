@@ -32,6 +32,8 @@ from backend.crypto_merkle import (
     canonical_leaf_bytes,
 )
 from backend.rate_limiter import RedisDistributedRateLimiter
+from backend.recovery_pipeline import RecoveryPipeline
+
 from backend.api.schemas import (
     BanditStateResponse,
     BanditArmState,
@@ -122,6 +124,18 @@ model = load_model()
 DB_URL = "postgres://recovery:recovery@localhost:5432/recovery_engine?sslmode=disable"
 bandit_engine = ThompsonSamplingBandit(database_url=DB_URL)
 rate_limiter_engine = RedisDistributedRateLimiter.get_instance()
+
+# Lazy-init: shared pipeline instance (loaded once, reused across inject calls)
+_pipeline_instance: RecoveryPipeline | None = None
+
+def _get_pipeline() -> RecoveryPipeline:
+    global _pipeline_instance
+    if _pipeline_instance is None:
+        _pipeline_instance = RecoveryPipeline(
+            database_url=DB_URL,
+            go_executor_url="http://localhost:8080",
+        )
+    return _pipeline_instance
 
 
 def _hash_leaf(data: str) -> str:
@@ -301,6 +315,80 @@ def decide_recovery(request: RecoveryDecisionRequest) -> RecoveryDecisionRespons
         probability=float(final_prob),
         expected_value=float(final_ev),
     )
+
+
+# ==========================================
+# 1b. Full-Pipeline Injection Endpoint
+# Runs a payment through the COMPLETE pipeline:
+# RF → EV → Thompson Sampling → Policy → Go Executor → PostgreSQL audit
+# ==========================================
+
+import random as _random
+import uuid as _uuid
+
+_BANKS        = ["HDFC", "ICICI", "SBI", "AXIS", "KOTAK", "YES", "PNB"]
+_METHODS      = ["UPI", "NET_BANKING", "CARD", "WALLET"]
+_FAIL_CODES   = ["BANK_TIMEOUT", "INSUFFICIENT_FUNDS", "GATEWAY_ERROR",
+                 "CARD_DECLINED", "UPI_TIMEOUT", "NETWORK_ERROR"]
+_METHOD_W     = [0.65, 0.20, 0.10, 0.05]
+_FAIL_W       = [0.28, 0.22, 0.15, 0.12, 0.10, 0.13]
+
+def _random_payment() -> dict:
+    bank        = _random.choice(_BANKS)
+    method      = _random.choices(_METHODS, weights=_METHOD_W, k=1)[0]
+    failure     = _random.choices(_FAIL_CODES, weights=_FAIL_W, k=1)[0]
+    base_sr     = _random.uniform(0.45, 0.85)
+    success_r   = max(0.05, min(0.99, base_sr + _random.gauss(0, 0.10)))
+    recovery_r  = max(0.03, min(0.95, success_r * _random.uniform(0.5, 0.9)))
+    amount      = round(_random.choices(
+        [_random.uniform(500, 4999), _random.uniform(5000, 49999),
+         _random.uniform(50000, 300000)],
+        weights=[0.55, 0.35, 0.10], k=1
+    )[0], 2)
+    return {
+        "payment_id":     f"inject-{_uuid.uuid4().hex[:10]}",
+        "customer_id":    f"cust_{_random.randint(1, 9999):05d}",
+        "amount":         amount,
+        "payment_method": method,
+        "bank":           bank,
+        "failure_code":   failure,
+        "success_rate":   round(success_r, 4),
+        "recovery_rate":  round(recovery_r, 4),
+        "hour":           datetime.now(timezone.utc).hour,
+    }
+
+@app.post("/v1/recovery/inject")
+def inject_recovery_event(payload: Optional[Dict[str, Any]] = None):
+    """
+    Inject one payment failure through the complete pipeline.
+    If no payload is provided, generates a realistic random payment.
+    The event flows through:
+      Random Forest → Expected Value → Thompson Sampling → Policy Gate
+      → Go Executor → PostgreSQL audit → Bandit posterior update
+    Returns the full pipeline result including audit proof.
+    """
+    p = payload or _random_payment()
+    try:
+        pipeline = _get_pipeline()
+        result = pipeline.process_payment(
+            payment_id=p.get("payment_id", f"inject-{_uuid.uuid4().hex[:10]}"),
+            customer_id=p.get("customer_id", "cust_injected"),
+            amount=float(p.get("amount", 5000)),
+            failure_code=p.get("failure_code", "BANK_TIMEOUT"),
+            success_rate=float(p.get("success_rate", 0.65)),
+            recovery_rate=float(p.get("recovery_rate", 0.45)),
+            payment_method=p.get("payment_method", "UPI"),
+            bank=p.get("bank", "HDFC"),
+            hour=int(p.get("hour", datetime.now(timezone.utc).hour)),
+        )
+        return {
+            "status": "injected",
+            "source": "full_pipeline",
+            "input": p,
+            **result,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pipeline error: {e}")
 
 
 # ==========================================

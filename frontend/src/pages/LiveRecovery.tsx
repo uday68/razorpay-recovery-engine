@@ -50,22 +50,11 @@ export const LiveRecovery: React.FC = () => {
   const handleInjectTestEvent = async () => {
     setInjecting(true);
     try {
-      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-      const testPaymentId = `pay_live_test_${randomSuffix}`;
-      const amount = Math.floor(1500 + Math.random() * 8500);
-      const decision = await recoveryApi.getDecision({
-        event_id: `evt_${randomSuffix}`,
-        event_type: "PAYMENT_FAILED",
-        payment_id: testPaymentId,
-        customer_id: `cust_${randomSuffix}`,
-        amount: amount,
-        payment_method: "UPI",
-        bank: "HDFC",
-        failure_code: "BANK_TIMEOUT",
-        timestamp: new Date().toISOString(),
-        success_rate: 0.78,
-        recovery_rate: 0.52,
-      });
+      // POST to /v1/recovery/inject — backend generates a random realistic
+      // payment failure and runs it through the COMPLETE pipeline:
+      //   Random Forest → EV → Thompson Sampling → Policy Gate
+      //   → Go Executor → PostgreSQL audit → Bandit posterior update
+      const result = await recoveryApi.injectEvent();
 
       const now = new Date();
       const timeStr = `${now.getHours().toString().padStart(2, "0")}:${now
@@ -76,25 +65,32 @@ export const LiveRecovery: React.FC = () => {
         .toString()
         .padStart(3, "0")}`;
 
+      const input = (result.input || {}) as Record<string, unknown>;
       const newTx: TransactionRowData = {
-        paymentId: testPaymentId,
-        timestamp: timeStr,
-        method: "UPI",
-        bank: "HDFC",
-        amount: amount,
-        failureCode: "BANK_TIMEOUT",
-        expectedValue: decision.expected_value || 350.0,
-        action: (decision.action as any) || "RETRY_NOW",
-        status: "RECOVERED",
+        paymentId:     String(result.payment_id || input.payment_id || "unknown"),
+        timestamp:     timeStr,
+        method:        String(input.payment_method || "UPI"),
+        bank:          String(input.bank || "HDFC"),
+        amount:        Number(input.amount || 0),
+        failureCode:   String(input.failure_code || "UNKNOWN"),
+        expectedValue: Number(result.expected_value || 0),
+        action:        (result.executed_action || result.recommended_action || "NO_ACTION") as any,
+        // Status reflects the REAL pipeline outcome — not hardcoded
+        status:        result.recovered ? "RECOVERED" : "FAILED",
       };
 
+      // Prepend to local list for immediate feedback
       setTransactions((prev) => [newTx, ...prev]);
+
+      // Refresh from DB after a short delay so the real audit record appears
+      setTimeout(fetchStreamData, 1200);
     } catch (err) {
       console.error("Failed to inject live event:", err);
     } finally {
       setInjecting(false);
     }
   };
+
 
   const kafkaPartitions = streamStatus?.partitions?.map((p) => ({
     partition: p.partition,
